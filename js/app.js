@@ -228,8 +228,13 @@ function render() {
   $("workspaceName").textContent = visibleWorkspaceName;
   $("settingsWorkspace").value = visibleWorkspaceName;
   renderToday();renderTasks();renderMeals();renderGroceries();renderPeople();renderLedger();renderCalendar();
-  const away=Store.getState().workspace.away;
-  $("awayButton").innerHTML=away?`☼ <span class="desktop-only">Away mode on</span>`:`☼ <span class="desktop-only">Away mode</span>`;
+  const away=Cloud.getAwayPeriods();
+  $("awayButton").innerHTML=away.length?`☼ <span class="desktop-only">Away mode on</span>`:`☼ <span class="desktop-only">Away mode</span>`;
+  $("awayButton").disabled=!Cloud.canManageAway();
+  $("turnOffAway").disabled=!away.length || !Cloud.canManageAway();
+  $("awayStatus").textContent=away.length
+    ? away.map(p=>{const person=Cloud.getState().people.find(x=>x.id===p.member_profile_id);return `${person?person.name:"Entire household"} · ${p.ends_at?"Until "+new Date(p.ends_at).toLocaleString():"Until manually turned off"}`;}).join("\n")
+    : "Away Mode is currently off.";
 }
 function esc(s="") { return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function populatePeopleSelects() {
@@ -368,8 +373,8 @@ function setup() {
   $("exportData").onclick=()=>{const blob=new Blob([Store.exportState()],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wiwy-backup-"+keyDate()+".json";a.click();URL.revokeObjectURL(a.href);};
   $("importData").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{Store.importState(JSON.parse(await f.text()));render();toast("Backup imported.");}catch(err){alert(err.message);}e.target.value="";};
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
-  $("awayEditor").addEventListener("submit",e=>{e.preventDefault();const scope=$("awayScope").value;Store.setAway({scope,personId:scope==="person"?$("awayPerson").value:null,duration:$("awayDuration").value,enabledAt:new Date().toISOString()});$("awayDialog").close();render();toast("Away mode enabled.");});
-  $("turnOffAway").onclick=()=>{Store.setAway(null);$("awayDialog").close();render();toast("Away mode turned off.");};
+  $("awayEditor").addEventListener("submit",async e=>{e.preventDefault();const scope=$("awayScope").value;try{await Cloud.enableAway({scope,memberProfileId:scope==="person"?$("awayPerson").value:null,duration:$("awayDuration").value});$("awayDialog").close();render();toast("✓ Away Mode enabled.");}catch(error){$("awayStatus").textContent=error.message;}});
+  $("turnOffAway").onclick=async()=>{try{await Cloud.disableAway({scope:"workspace"});$("awayDialog").close();render();toast("Away Mode turned off.");}catch(error){$("awayStatus").textContent=error.message;}};
   $("mobileMenu").onclick=()=> {
     if ($("sidebar").classList.contains("open")) closeSidebar();
     else openSidebar();

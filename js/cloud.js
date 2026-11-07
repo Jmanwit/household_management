@@ -5,6 +5,7 @@ let membership = null;
 let user = null;
 let state = { people: [], tasks: [] };
 let activity = [];
+let awayPeriods = [];
 let permissions = new Set();
 let channel = null;
 let refreshBusy = false;
@@ -54,6 +55,8 @@ const mapTask = (row, ops, assignments, occurrences, completions) => {
 
 export function getState() { return structuredClone(state); }
 export function getActivity() { return structuredClone(activity); }
+export function getAwayPeriods() { return structuredClone(awayPeriods); }
+export function canManageAway() { return isAdmin() || membership?.role === "Manager"; }
 export function getCurrentUser() { return user; }
 export function getMembership() { return membership; }
 export function isAdmin() { return membership?.role === "Admin"; }
@@ -108,6 +111,7 @@ export async function initialize(authClient, activeWorkspace, activeMembership, 
     .on("postgres_changes", { event:"*", schema:"public", table:"task_operations" }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_operation_completions", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"activity_ledger", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"away_periods", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .subscribe();
   // Polling is a fallback if Realtime is not enabled for these tables.
   refreshTimer = setInterval(() => refreshQuietly(), 20000);
@@ -123,14 +127,17 @@ export async function refresh() {
   if (refreshBusy) return getState();
   refreshBusy = true;
   try {
-    const [peopleRes, taskRes, activityRes] = await Promise.all([
+    const [peopleRes, taskRes, activityRes, awayRes] = await Promise.all([
       client.from("member_profiles").select("id,workspace_id,display_name,color,created_at").eq("workspace_id", workspace.id).order("created_at"),
       client.from("tasks").select("id,workspace_id,name,assignee_profile_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
-      client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100)
+      client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
+      client.from("away_periods").select("id,workspace_id,member_profile_id,starts_at,ends_at,is_active,created_by").eq("workspace_id", workspace.id).eq("is_active", true).order("starts_at", {ascending:false})
     ]);
     if (peopleRes.error) throw peopleRes.error;
     if (taskRes.error) throw taskRes.error;
     if (activityRes.error) throw activityRes.error;
+    if (awayRes.error) throw awayRes.error;
+    awayPeriods = (awayRes.data || []).filter(p => !p.ends_at || new Date(p.ends_at) > new Date());
     const profileNames = new Map((peopleRes.data || []).map(p => [p.id,p.display_name]));
     activity = (activityRes.data || []).map(row => ({
       ...row,
@@ -323,4 +330,55 @@ export function destroy() {
   channel = null;
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = null;
+}
+
+
+function tomorrowAtFiveInWorkspaceTimezone() {
+  const zone = workspace?.timezone || "America/Chicago";
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone:zone, year:"numeric", month:"2-digit", day:"2-digit"
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(p=>[p.type,p.value]));
+  const localTomorrow = new Date(Date.UTC(Number(values.year),Number(values.month)-1,Number(values.day)+1,5,0,0));
+  // Convert the intended workspace-local 05:00 to UTC, accounting for DST.
+  const getOffset = date => {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+      timeZone:zone, year:"numeric",month:"2-digit",day:"2-digit",
+      hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
+    }).formatToParts(date).map(x=>[x.type,x.value]));
+    return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second)-date.getTime();
+  };
+  let target = new Date(localTomorrow.getTime()-getOffset(localTomorrow));
+  target = new Date(localTomorrow.getTime()-getOffset(target));
+  return target.toISOString();
+}
+export async function enableAway({scope, memberProfileId, duration}) {
+  if (!canManageAway()) throw new Error("Only a Manager or Admin can manage Away Mode.");
+  if (scope === "person" && !memberProfileId) throw new Error("Choose a household member.");
+  const endsAt = duration === "indefinite" ? null : tomorrowAtFiveInWorkspaceTimezone();
+  const {error} = await client.from("away_periods").insert({
+    workspace_id:workspace.id,
+    member_profile_id:scope === "person" ? memberProfileId : null,
+    starts_at:new Date().toISOString(), ends_at:endsAt, is_active:true, created_by:user.id
+  });
+  if(error) throw error;
+  await recordActivity("Enabled Away Mode","away_period",null,{
+    scope, member_profile_id:memberProfileId || null, ends_at:endsAt
+  });
+  await refresh();
+  document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
+}
+export async function disableAway({scope="workspace", memberProfileId=null}={}) {
+  if (!canManageAway()) throw new Error("Only a Manager or Admin can manage Away Mode.");
+  let query=client.from("away_periods").update({is_active:false})
+    .eq("workspace_id",workspace.id).eq("is_active",true);
+  if(scope==="person") query=query.eq("member_profile_id",memberProfileId);
+  const {error}=await query;
+  if(error) throw error;
+  await recordActivity("Turned off Away Mode","away_period",null,{
+    scope,member_profile_id:memberProfileId
+  });
+  await refresh();
+  document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
 }
