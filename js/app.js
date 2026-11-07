@@ -266,7 +266,25 @@ function openTask(task=null) {
   operations=(task?.operations||[]).map(o=>({...o}));
   $("deleteTaskButton").hidden=!(task && Cloud.canManageTask(task));
   $("weekdayPicker").hidden=$("taskRepeat").value!=="weekdays";
-  renderOperations();renderWeekdays();$("taskEditor").dataset.initialSnapshot=taskEditorSnapshot();$("taskDialog").showModal();
+  renderOperations();
+  renderWeekdays();
+  $("taskEditor").dataset.initialSnapshot=taskEditorSnapshot();
+  const closeButton=$("closeTaskEditor");
+  closeButton.onclick=async(event)=>{
+    event.preventDefault();
+    event.stopPropagation();
+    if(!taskEditorHasChanges()){
+      $("taskDialog").close();
+      return;
+    }
+    const confirmed=await askWIWYConfirm(
+      "Discard task changes?",
+      "Are you sure you want to cancel task creation? Your unsaved information will be lost.",
+      "Discard task"
+    );
+    if(confirmed)$("taskDialog").close();
+  };
+  $("taskDialog").showModal();
 }
 function renderOperations() {
   $("operationEditor").innerHTML=operations.map((o,i)=>`<div class="operation-row"><input type="checkbox" ${o.required===false?"":"checked"} data-op-required="${i}" style="width:16px"><input type="text" value="${esc(o.name)}" data-op-name="${i}"><button type="button" class="op-remove" data-op-remove="${i}">×</button></div>`).join("");
@@ -307,11 +325,8 @@ function setup() {
   $("addOperation").onclick=()=>{const v=$("newOperation").value.trim();if(v){operations.push({name:v,required:true});$("newOperation").value="";renderOperations();}};
   $("operationEditor").addEventListener("click",e=>{const i=e.target.dataset.opRemove;if(i!==undefined){operations.splice(Number(i),1);renderOperations();}});
   $("operationEditor").addEventListener("change",e=>{if(e.target.dataset.opRequired!==undefined)operations[Number(e.target.dataset.opRequired)].required=e.target.checked;if(e.target.dataset.opName!==undefined)operations[Number(e.target.dataset.opName)].name=e.target.value;});
-  $("closeTaskEditor").onclick=async()=>{
-    if(!taskEditorHasChanges()){$("taskDialog").close();return;}
-    const confirmed=await askWIWYConfirm("Discard task changes?","Are you sure you want to cancel task creation? Your unsaved information will be lost.","Discard task");
-    if(confirmed)$("taskDialog").close();
-  };
+  // Task editor close is bound when the dialog opens, so it cannot be skipped
+  // by any later setup-time event wiring.
   $("taskEditor").addEventListener("submit",e=>{e.preventDefault();saveTaskFromForm();});
   $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&await askWIWYConfirm("Delete task?","This removes the task definition. This action cannot be undone.","Delete task")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
   $("taskList").addEventListener("click",async e=>{
