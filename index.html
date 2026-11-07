@@ -42,7 +42,7 @@
         <button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
         <div><div class="eyebrow" id="dateLabel">YOUR HOUSEHOLD</div><h1 id="pageTitle">Today</h1></div>
         <div class="top-actions">
-          <button class="icon-button" id="awayButton" title="Away mode">☼ <span class="desktop-only">Away mode</span></button>
+          <button class="icon-button" id="awayButton" title="Away mode synchronization is coming later" disabled>☼ <span class="desktop-only">Away mode</span></button>
           <button class="icon-button notification-button" id="notificationButton" title="Notifications">♧<i></i></button>
           <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false">♙</button>
           <div id="accountMenu" class="account-menu" hidden>
@@ -86,20 +86,20 @@
       </section>
 
       <section class="view" id="view-tasks">
-        <div class="view-toolbar"><p class="muted">Routines, responsibilities, and the little things that keep life moving.</p><button class="primary-button" id="newTaskButton">＋ <span>New task</span></button></div>
+        <div class="view-toolbar"><p class="muted">Shared household tasks. One assigned member can complete a shared task for everyone.</p><button class="primary-button" id="newTaskButton">＋ <span>New task</span></button></div>
         <div class="filter-row"><button class="filter-chip selected" data-task-filter="all">All tasks</button><button class="filter-chip" data-task-filter="active">Active</button><button class="filter-chip" data-task-filter="recurring">Recurring</button></div>
         <div class="panel"><div id="taskList" class="task-list"></div></div>
       </section>
 
       <section class="view" id="view-meals">
-        <div class="view-toolbar"><p class="muted">Plan the food, prep, and shared moments around the table.</p><button class="primary-button" id="addMealButton">＋ <span>Add meal</span></button></div>
+        <div class="view-toolbar"><p class="muted">Plan the food, prep, and shared moments around the table.</p><button class="primary-button" id="addMealButton" disabled>＋ <span>Add meal</span></button></div><p class="sync-note">Meal-plan synchronization is coming in a later update. Editing is temporarily paused so devices do not develop conflicting copies.</p>
         <div class="panel"><div class="panel-heading"><div><span class="eyebrow">THIS WEEK</span><h3>Meal plan</h3></div></div><div id="mealList" class="meal-list"></div></div>
       </section>
 
       <section class="view" id="view-groceries">
         <div class="view-toolbar"><p class="muted">One shared list. Fewer forgotten things.</p></div>
-        <form id="groceryForm" class="add-inline"><input id="groceryInput" placeholder="Add an item…" autocomplete="off"><select id="groceryCategory"><option>General</option><option>Produce</option><option>Meat & seafood</option><option>Dairy</option><option>Pantry</option><option>Household</option></select><button class="primary-button">Add</button></form>
-        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">SHOPPING LIST</span><h3 id="groceryHeading">Items to pick up</h3></div><button class="text-button" id="clearGroceries">Clear completed</button></div><div id="groceryList" class="grocery-list"></div></div>
+        <p class="sync-note">Grocery-list synchronization is coming in a later update. Editing is temporarily paused so everyone sees one consistent list.</p><form id="groceryForm" class="add-inline"><input id="groceryInput" placeholder="Grocery sync coming soon" disabled autocomplete="off"><select id="groceryCategory" disabled><option>General</option><option>Produce</option><option>Meat & seafood</option><option>Dairy</option><option>Pantry</option><option>Household</option></select><button class="primary-button" disabled>Add</button></form>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">SHOPPING LIST</span><h3 id="groceryHeading">Items to pick up</h3></div><button class="text-button" id="clearGroceries" disabled>Clear completed</button></div><div id="groceryList" class="grocery-list"></div></div>
       </section>
 
       <section class="view" id="view-people">
@@ -129,7 +129,7 @@
       <div class="modal-head"><div><span class="eyebrow">TASK BUILDER</span><h2 id="taskDialogTitle">Create a task</h2></div><button class="close-button" value="cancel" aria-label="Close">×</button></div>
       <input type="hidden" id="taskId">
       <label>Task name<input id="taskName" required maxlength="100" placeholder="e.g. Kitchen reset"></label>
-      <div class="form-row"><label>Responsible person<select id="taskAssignee"></select></label><label>Repeat<select id="taskRepeat"><option value="once">One time</option><option value="daily">Every day</option><option value="weekdays">Selected weekdays</option></select></label></div>
+      <div class="form-row"><label>Assigned members<div id="taskAssigneeOptions" class="assignee-options" aria-describedby="assigneeHelp"></div><span id="assigneeHelp" class="label-hint">Choose everyone who shares responsibility for this task. Any one assigned person can complete it.</span></label><label>Repeat<select id="taskRepeat"><option value="once">One time</option><option value="daily">Every day</option><option value="weekdays">Selected weekdays</option></select></label></div>
       <div id="weekdayPicker" class="weekday-picker" hidden><button type="button" data-day="1">M</button><button type="button" data-day="2">T</button><button type="button" data-day="3">W</button><button type="button" data-day="4">T</button><button type="button" data-day="5">F</button><button type="button" data-day="6">S</button><button type="button" data-day="0">S</button></div>
       <div class="form-row"><label>Start time<input type="time" id="taskStart"></label><label>End time<input type="time" id="taskEnd"></label></div>
       <label>Task steps <span class="label-hint">Optional · add the steps that define done</span></label>
@@ -141,7 +141,7 @@
   </dialog>
 
   <dialog id="personDialog" class="modal small-modal">
-    <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button class="close-button" value="cancel">×</button></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><label>Role<select id="personRole"><option>Member</option><option>Manager</option><option>Admin</option></select></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
+    <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button class="close-button" value="cancel">×</button></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
   </dialog>
 
   <dialog id="mealDialog" class="modal small-modal">
