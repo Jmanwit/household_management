@@ -128,23 +128,3 @@ export async function requireAuth() {
 export function getSupabase() { return client; }
 export function getActiveWorkspace() { return activeWorkspace; }
 export function getActiveMembership() { return activeMembership; }
-export function getActiveUser() { return client?.auth?.getUser ? null : null; }
-export async function renameActiveWorkspace(name) {
-  const cleanName = String(name || "").trim();
-  if (!cleanName) throw new Error("Workspace name is required.");
-  if (!client || !activeWorkspace?.id) throw new Error("No active workspace is available.");
-  const { data, error } = await client.from("workspaces")
-    .update({ name: cleanName })
-    .eq("id", activeWorkspace.id)
-    .select("id,name,timezone")
-    .single();
-  if (error) throw error;
-  activeWorkspace = data;
-  return data;
-}
-export async function getSignedInUser() {
-  if (!client) return null;
-  const { data, error } = await client.auth.getUser();
-  if (error) throw error;
-  return data.user;
-}
