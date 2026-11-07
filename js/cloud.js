@@ -34,9 +34,11 @@ const mapTask = (row, ops, assignments, occurrences) => {
     createdBy: row.created_by, createdAt: row.created_at,
     operations: ops.filter(o => o.task_id === row.id)
       .sort((a,b) => a.sort_order - b.sort_order)
-      .map(o => ({ id:o.id, name:o.label, required:o.is_required })),
+      .map(o => ({ id:o.id, name:o.label, required:o.is_required,
+        completed:Boolean(o.completion?.completed_at), completedAt:o.completion?.completed_at })),
     occurrences: occurrence ? {
       [occurrence.occurrence_date]: {
+        id: occurrence.id,
         status: occurrence.status === "in_progress" ? "progress" : occurrence.status,
         completedAt: occurrence.completed_at, completedBy: occurrence.completed_by,
         completedByProfileId: occurrence.completed_by_profile_id
@@ -114,7 +116,7 @@ export async function refresh() {
       if (error) throw error;
     }
     const taskIds = taskRows.map(t => t.id);
-    let ops = [], assignments = [], occurrences = [];
+    let ops = [], assignments = [], occurrences = [], completions = [];
     if (taskIds.length) {
       const [opRes, assignRes, occRes] = await Promise.all([
         client.from("task_operations").select("id,task_id,label,sort_order,is_required").in("task_id", taskIds),
@@ -125,10 +127,19 @@ export async function refresh() {
       if (assignRes.error) throw assignRes.error;
       if (occRes.error) throw occRes.error;
       ops = opRes.data || []; assignments = assignRes.data || []; occurrences = occRes.data || [];
+      const occurrenceIds = occurrences.map(o => o.id);
+      if (occurrenceIds.length) {
+        const completionRes = await client.from("task_operation_completions")
+          .select("id,occurrence_id,operation_id,completed_at,completed_by")
+          .in("occurrence_id", occurrenceIds);
+        if (completionRes.error) throw completionRes.error;
+        completions = completionRes.data || [];
+      }
     }
+    const opsWithCompletion = ops.map(op => ({...op, completion:completions.find(x => x.operation_id === op.id && occurrences.some(o => o.id === x.occurrence_id)) || null}));
     state = {
       people: (peopleRes.data || []).map(p => ({id:p.id,name:p.display_name,color:p.color,role:"Household member",accountId:null})),
-      tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences))
+      tasks: taskRows.map(t => mapTask(t, opsWithCompletion, assignments, occurrences))
     };
     return getState();
   } finally { refreshBusy = false; }
@@ -209,12 +220,61 @@ export async function deleteTask(id) {
 }
 export async function setOccurrence(taskId, dateKey, status) {
   const task = state.tasks.find(t => t.id === taskId);
-  if (!task || !canCompleteTask(task)) throw new Error("You must be assigned to this task to change its progress.");
+  if (!task || !(canCompleteTask(task) || (status === "not_started" && canManageTask(task)))) throw new Error("You must be assigned to this task to change its progress.");
   const { error } = await client.rpc("set_task_occurrence_status", {
     target_task: taskId, target_date: dateKey, new_status: status
   });
   if (error) throw error;
   await refresh();
+}
+export async function setOperationCompletion(taskId, dateKey, operationId, completed) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task || !canCompleteTask(task)) throw new Error("You must be assigned to this task to update its steps.");
+  const occurrenceId = task.occurrences?.[dateKey]?.id;
+  if (!occurrenceId) throw new Error("The task occurrence has not been created yet. Refresh and try again.");
+  if (task.occurrences?.[dateKey]?.status === "completed" && !canManageTask(task))
+    throw new Error("This task is already completed. Ask its creator or a Manager/Admin to reopen it before changing steps.");
+  if (completed) {
+    const { error } = await client.from("task_operation_completions").upsert({
+      occurrence_id:occurrenceId, operation_id:operationId,
+      completed_at:new Date().toISOString(), completed_by:user.id
+    }, {onConflict:"occurrence_id,operation_id"});
+    if (error) throw error;
+  } else {
+    const { error } = await client.from("task_operation_completions").delete()
+      .eq("occurrence_id", occurrenceId).eq("operation_id", operationId);
+    if (error) throw error;
+  }
+  await refresh();
+  const updated = state.tasks.find(t => t.id === taskId);
+  const required = (updated?.operations || []).filter(o => o.required);
+  if (required.length && required.every(o => o.completed) && updated.occurrences?.[dateKey]?.status !== "completed") {
+    await setOccurrence(taskId, dateKey, "completed");
+  } else if (completed && updated.occurrences?.[dateKey]?.status === "not_started") {
+    await setOccurrence(taskId, dateKey, "in_progress");
+  }
+  await refresh();
+}
+export async function completeAllStepsAndTask(taskId, dateKey) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task || !canCompleteTask(task)) throw new Error("You must be assigned to this task to complete it.");
+  const occurrenceId = task.occurrences?.[dateKey]?.id;
+  if (!occurrenceId) throw new Error("The task occurrence has not been created yet. Refresh and try again.");
+  const rows = (task.operations || []).map(o => ({occurrence_id:occurrenceId,operation_id:o.id,completed_at:new Date().toISOString(),completed_by:user.id}));
+  if (rows.length) {
+    const { error } = await client.from("task_operation_completions").upsert(rows,{onConflict:"occurrence_id,operation_id"});
+    if (error) throw error;
+  }
+  await setOccurrence(taskId,dateKey,"completed");
+}
+export async function reopenTask(taskId, dateKey) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task || !canManageTask(task)) throw new Error("Only the task creator or an authorized Manager/Admin can reopen this task.");
+  const occurrenceId = task.occurrences?.[dateKey]?.id;
+  if (!occurrenceId) throw new Error("The task occurrence could not be found.");
+  const { error } = await client.from("task_operation_completions").delete().eq("occurrence_id",occurrenceId);
+  if (error) throw error;
+  await setOccurrence(taskId,dateKey,"not_started");
 }
 export function destroy() {
   if (channel && client) client.removeChannel(channel);

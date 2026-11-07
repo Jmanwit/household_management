@@ -5,7 +5,7 @@ import { requireAuth, renameActiveWorkspace, getSignedInUser } from "./auth.js";
 const $ = id => document.getElementById(id);
 const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const shortDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [];
+let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [], viewHistory = [];
 let toastTimer;
 let authenticatedWorkspace = null;
 let signedInUser = null;
@@ -50,14 +50,18 @@ function openSidebar() {
   $("sidebar").classList.add("open");
   $("sidebarBackdrop").classList.add("visible");
 }
-function setView(view) {
+function setView(view, fromBack=false) {
+  if (view === currentView) return;
+  if (!fromBack) viewHistory.push(currentView);
   currentView=view;
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`view-${view}`));
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   $("pageTitle").textContent={today:"Today",calendar:"Calendar",tasks:"Tasks",meals:"Meals",groceries:"Groceries",people:"People",ledger:"Activity",settings:"Settings"}[view]||"Today";
+  $("pageBack").hidden = view === "today";
   closeSidebar();
   render();
 }
+function goBack() { const previous=viewHistory.pop()||"today"; setView(previous,true); }
 function renderToday() {
   const state={...Store.getState(), ...Cloud.getState()}, tasks=todayTasks();
   const done=tasks.filter(t=>statusFor(t)==="done").length, progress=tasks.filter(t=>statusFor(t)==="progress").length, late=tasks.filter(t=>statusFor(t)==="late").length;
@@ -80,7 +84,14 @@ function renderTasks() {
     if(taskFilter==="recurring") return t.repeat!=="once";
     return !t.archived;
   });
-  $("taskList").innerHTML=tasks.length?tasks.map(t=>{const done=t.occurrences?.[keyDate()]?.status==="completed";const names=(t.assigneeIds||[]).map(personName).join(", ")||"Unassigned";const canEdit=Cloud.canManageTask(t);const canComplete=Cloud.canCompleteTask(t);return `<div class="task-row"><button class="task-check ${done?"checked":""}" data-complete="${t.id}" ${!canComplete||done?"disabled":""} aria-label="Complete task">${done?"✓":""}</button><div class="task-main"><div class="task-title">${esc(t.name)}</div><div class="task-detail">${esc(names)} · ${repeatText(t)} · ${t.operations?.length||0} steps${done?" · Completed"+(t.occurrences?.[keyDate()]?.completedByProfileId?" by "+esc(personName(t.occurrences[keyDate()].completedByProfileId)):""):""}</div></div><div class="task-time">${timeText(t.start)}</div>${canEdit?`<button class="task-edit" data-edit-task="${t.id}" aria-label="Edit task">⋯</button>`:""}</div>`}).join(""):empty("No tasks here yet","Add a task to begin building your household routine.");
+  $("taskList").innerHTML=tasks.length?tasks.map(t=>{
+    const occ=t.occurrences?.[keyDate()], done=occ?.status==="completed";
+    const names=(t.assigneeIds||[]).map(personName).join(", ")||"Unassigned";
+    const canEdit=Cloud.canManageTask(t), canComplete=Cloud.canCompleteTask(t);
+    const steps=(t.operations||[]).map(o=>`<label class="task-step ${o.completed?"step-done":""}"><input type="checkbox" data-step-task="${t.id}" data-step-id="${o.id}" ${o.completed?"checked":""} ${!canComplete||done?"disabled":""}><span>${esc(o.name)}</span></label>`).join("");
+    const required=(t.operations||[]).filter(o=>o.required), allStepsDone=required.length>0&&required.every(o=>o.completed);
+    return `<article class="task-card ${done?"task-card-done":""}"><div class="task-row"><button class="task-check ${done?"checked":""}" data-complete="${t.id}" ${!canComplete||done?"disabled":""} aria-label="Complete task">${done?"✓":""}</button><div class="task-main"><div class="task-title">${esc(t.name)}</div><div class="task-detail">${esc(names)} · ${repeatText(t)} · ${(t.operations||[]).length} steps${done?" · Completed"+(occ?.completedByProfileId?" by "+esc(personName(occ.completedByProfileId)):""):""}</div></div><div class="task-time">${timeText(t.start)}</div>${done&&canEdit?`<button class="reopen-task" data-reopen-task="${t.id}">Reopen</button>`:canEdit?`<button class="task-edit" data-edit-task="${t.id}" aria-label="Edit task">⋯</button>`:""}</div>${steps?`<div class="task-steps">${steps}</div>${allStepsDone&&!done?`<p class="steps-hint">All required steps are complete. The task will finish automatically.</p>`:""}`:""}</article>`;
+  }).join(""):empty("No tasks here yet","Add a task to begin building your household routine.");
 }
 function repeatText(t) { return t.repeat==="daily"?"Daily":t.repeat==="weekdays"?(t.weekdays||[]).map(x=>shortDays[x]).join(", "):"One time"; }
 function renderMeals() {
@@ -161,6 +172,7 @@ async function saveTaskFromForm() {
 function setup() {
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
   document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.go)));
+  $("pageBack").onclick=goBack;
   $("quickAddTask").onclick=$("newTaskButton").onclick=()=>openTask();
   $("taskRepeat").onchange=()=>{$("weekdayPicker").hidden=$("taskRepeat").value!=="weekdays";};
   document.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{const d=Number(b.dataset.day);selectedDays.has(d)?selectedDays.delete(d):selectedDays.add(d);renderWeekdays();});
@@ -169,7 +181,21 @@ function setup() {
   $("operationEditor").addEventListener("change",e=>{if(e.target.dataset.opRequired!==undefined)operations[Number(e.target.dataset.opRequired)].required=e.target.checked;if(e.target.dataset.opName!==undefined)operations[Number(e.target.dataset.opName)].name=e.target.value;});
   $("taskEditor").addEventListener("submit",e=>{e.preventDefault();saveTaskFromForm();});
   $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&confirm("Delete this task? Its task definition will be removed.")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
-  $("taskList").addEventListener("click",async e=>{const id=e.target.dataset.editTask;if(id)openTask(Cloud.getState().tasks.find(t=>t.id===id));const complete=e.target.dataset.complete;if(complete){try{await Cloud.setOccurrence(complete,keyDate(),"completed");render();toast("Task completed for everyone.");}catch(error){toast("Could not complete task: "+error.message);}}});
+  $("taskList").addEventListener("click",async e=>{
+    const edit=e.target.dataset.editTask;if(edit)openTask(Cloud.getState().tasks.find(t=>t.id===edit));
+    const complete=e.target.dataset.complete;
+    if(complete){const task=Cloud.getState().tasks.find(t=>t.id===complete);try{
+      if(task.operations?.length){if(!confirm("Are all steps for this task complete? Select OK to mark every step and complete the task."))return;await Cloud.completeAllStepsAndTask(complete,keyDate());}
+      else await Cloud.setOccurrence(complete,keyDate(),"completed");
+      render();toast("✓ Task completed for everyone.");
+    }catch(error){toast("Could not complete task: "+error.message);}}
+    const reopen=e.target.dataset.reopenTask;
+    if(reopen&&confirm("Reopen this task and clear its step checkmarks?")){try{await Cloud.reopenTask(reopen,keyDate());render();toast("Task reopened.");}catch(error){toast("Could not reopen task: "+error.message);}}
+  });
+  $("taskList").addEventListener("change",async e=>{
+    const taskId=e.target.dataset.stepTask, operationId=e.target.dataset.stepId;
+    if(taskId&&operationId){try{await Cloud.setOperationCompletion(taskId,keyDate(),operationId,e.target.checked);render();const t=Cloud.getState().tasks.find(x=>x.id===taskId);if(t?.occurrences?.[keyDate()]?.status==="completed")toast("✓ All required steps completed. Task finished.");}catch(error){e.target.checked=!e.target.checked;toast("Could not update step: "+error.message);}}
+  });
   document.querySelectorAll("[data-task-filter]").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.taskFilter;document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x===b));renderTasks();});
   document.querySelectorAll("[data-summary-filter]").forEach(card=>{card.setAttribute("role","button");card.setAttribute("tabindex","0");card.setAttribute("aria-label","Show "+card.dataset.summaryFilter+" tasks");const activate=()=>{taskFilter=card.dataset.summaryFilter;setView("tasks");document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x.dataset.taskFilter===taskFilter));renderTasks();};card.addEventListener("click",activate);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate();}});});
   $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
