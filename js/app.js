@@ -231,9 +231,14 @@ function render() {
   const away=Cloud.getAwayPeriods();
   $("awayButton").innerHTML=away.length?`☼ <span class="desktop-only">Away mode on</span>`:`☼ <span class="desktop-only">Away mode</span>`;
   $("awayButton").disabled=!Cloud.canManageAway();
-  $("turnOffAway").disabled=!away.length || !Cloud.canManageAway();
-  $("awayStatus").textContent=away.length
-    ? away.map(p=>{const person=Cloud.getState().people.find(x=>x.id===p.member_profile_id);return `${person?person.name:"Entire household"} · ${p.ends_at?"Until "+new Date(p.ends_at).toLocaleString():"Until manually turned off"}`;}).join("\n")
+  const people=Cloud.getState().people;
+  $("awayStatus").innerHTML=away.length
+    ? `<div class="away-status-heading">Currently away</div>`+away.map(p=>{
+        const person=people.find(x=>x.id===p.member_profile_id);
+        const target=person?person.name:"Entire household";
+        const until=p.ends_at?"Until "+new Date(p.ends_at).toLocaleString():"Until manually turned off";
+        return `<div class="away-period-row"><div class="away-period-copy"><strong>${esc(target)}</strong><span>${esc(until)}</span></div><button type="button" class="secondary-button away-cancel-button" data-away-period="${esc(p.id)}">Turn off</button></div>`;
+      }).join("")
     : "Away Mode is currently off.";
 }
 function esc(s="") { return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -374,7 +379,20 @@ function setup() {
   $("importData").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{Store.importState(JSON.parse(await f.text()));render();toast("Backup imported.");}catch(err){alert(err.message);}e.target.value="";};
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
   $("awayEditor").addEventListener("submit",async e=>{e.preventDefault();const scope=$("awayScope").value;try{await Cloud.enableAway({scope,memberProfileId:scope==="person"?$("awayPerson").value:null,duration:$("awayDuration").value});$("awayDialog").close();render();toast("✓ Away Mode enabled.");}catch(error){$("awayStatus").textContent=error.message;}});
-  $("turnOffAway").onclick=async()=>{try{await Cloud.disableAway({scope:"workspace"});$("awayDialog").close();render();toast("Away Mode turned off.");}catch(error){$("awayStatus").textContent=error.message;}};
+  $("awayStatus").addEventListener("click",async e=>{
+    const button=e.target.closest("[data-away-period]");
+    if(!button)return;
+    const periodId=button.dataset.awayPeriod;
+    button.disabled=true;
+    try{
+      await Cloud.disableAway({periodId});
+      render();
+      toast("Away Mode turned off.");
+    }catch(error){
+      button.disabled=false;
+      toast("Could not turn off Away Mode: "+error.message);
+    }
+  });
   $("mobileMenu").onclick=()=> {
     if ($("sidebar").classList.contains("open")) closeSidebar();
     else openSidebar();

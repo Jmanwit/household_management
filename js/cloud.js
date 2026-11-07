@@ -369,15 +369,18 @@ export async function enableAway({scope, memberProfileId, duration}) {
   await refresh();
   document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
 }
-export async function disableAway({scope="workspace", memberProfileId=null}={}) {
+export async function disableAway({periodId}={}) {
   if (!canManageAway()) throw new Error("Only a Manager or Admin can manage Away Mode.");
-  let query=client.from("away_periods").update({is_active:false})
-    .eq("workspace_id",workspace.id).eq("is_active",true);
-  if(scope==="person") query=query.eq("member_profile_id",memberProfileId);
-  const {error}=await query;
+  if (!periodId) throw new Error("Choose an active Away Mode period to turn off.");
+  const period=awayPeriods.find(p=>p.id===periodId);
+  if (!period) throw new Error("That Away Mode period is no longer active. Refresh and try again.");
+  const {error}=await client.from("away_periods").update({is_active:false})
+    .eq("id",periodId).eq("workspace_id",workspace.id).eq("is_active",true);
   if(error) throw error;
   await recordActivity("Turned off Away Mode","away_period",null,{
-    scope,member_profile_id:memberProfileId
+    scope:period.member_profile_id?"person":"workspace",
+    member_profile_id:period.member_profile_id || null,
+    period_id:periodId
   });
   await refresh();
   document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
