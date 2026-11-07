@@ -4,6 +4,7 @@ let workspace = null;
 let membership = null;
 let user = null;
 let state = { people: [], tasks: [] };
+let activity = [];
 let permissions = new Set();
 let channel = null;
 let refreshBusy = false;
@@ -48,6 +49,7 @@ const mapTask = (row, ops, assignments, occurrences) => {
 };
 
 export function getState() { return structuredClone(state); }
+export function getActivity() { return structuredClone(activity); }
 export function getCurrentUser() { return user; }
 export function getMembership() { return membership; }
 export function isAdmin() { return membership?.role === "Admin"; }
@@ -69,6 +71,20 @@ export function canCompleteTask(task) {
   return isAssignedToCurrentUser(task) || isAdmin() ||
     (membership?.role === "Manager" && permissions.has("tasks.manage_all"));
 }
+async function recordActivity(action, entityType, entityId, detail={}) {
+  try {
+    const { error } = await client.from("activity_ledger").insert({
+      workspace_id: workspace.id,
+      actor_user_id: user?.id || null,
+      actor_profile_id: membership?.member_profile_id || null,
+      action, entity_type: entityType, entity_id: entityId,
+      detail
+    });
+    if (error) console.warn("WIWY activity record was not saved:", error);
+  } catch (error) {
+    console.warn("WIWY activity record was not saved:", error);
+  }
+}
 export async function initialize(authClient, activeWorkspace, activeMembership, signedInUser) {
   client = authClient; workspace = activeWorkspace; membership = activeMembership; user = signedInUser;
   const { data: grants, error: grantError } = await client
@@ -87,6 +103,7 @@ export async function initialize(authClient, activeWorkspace, activeMembership, 
     .on("postgres_changes", { event:"*", schema:"public", table:"task_assignments" }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_operations" }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_operation_completions", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"activity_ledger", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .subscribe();
   // Polling is a fallback if Realtime is not enabled for these tables.
   refreshTimer = setInterval(() => refreshQuietly(), 20000);
@@ -102,12 +119,19 @@ export async function refresh() {
   if (refreshBusy) return getState();
   refreshBusy = true;
   try {
-    const [peopleRes, taskRes] = await Promise.all([
+    const [peopleRes, taskRes, activityRes] = await Promise.all([
       client.from("member_profiles").select("id,workspace_id,display_name,color,created_at").eq("workspace_id", workspace.id).order("created_at"),
-      client.from("tasks").select("id,workspace_id,name,assignee_profile_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false})
+      client.from("tasks").select("id,workspace_id,name,assignee_profile_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
+      client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100)
     ]);
     if (peopleRes.error) throw peopleRes.error;
     if (taskRes.error) throw taskRes.error;
+    if (activityRes.error) throw activityRes.error;
+    const profileNames = new Map((peopleRes.data || []).map(p => [p.id,p.display_name]));
+    activity = (activityRes.data || []).map(row => ({
+      ...row,
+      actorName: row.actor_profile_id ? (profileNames.get(row.actor_profile_id) || "Household member") : "Household member"
+    }));
     const taskRows = taskRes.data || [];
     const activeToday = taskRows.filter(t => !t.archived_at && dateOccurs(t, todayKey()));
     for (const task of activeToday) {
@@ -151,6 +175,7 @@ export async function addPerson(person) {
     workspace_id: workspace.id, display_name: person.name.trim(), color: person.color || "#789a80"
   }).select("id,display_name,color,created_at").single();
   if (error) throw error;
+  await recordActivity("Added a household member", "member_profile", data.id, {name:data.display_name});
   await refresh();
   return data;
 }
@@ -200,6 +225,7 @@ export async function saveTask(task) {
     const { error } = await client.from("tasks").update(taskPayload({...task,assigneeIds:ids})).eq("id", task.id);
     if (error) throw error;
     await replaceChildren(task.id, task, ids);
+    await recordActivity("Updated a task", "task", task.id, {task_name:task.name});
   } else {
     const payload = {...taskPayload({...task,assigneeIds:ids}),created_by:user.id};
     const { data, error } = await client.from("tasks").insert(payload).select("id").single();
@@ -209,6 +235,7 @@ export async function saveTask(task) {
       await client.from("tasks").delete().eq("id", data.id);
       throw e;
     }
+    await recordActivity("Created a task", "task", data.id, {task_name:task.name});
   }
   await refresh();
 }
@@ -217,6 +244,7 @@ export async function deleteTask(id) {
   if (!canManageTask(task)) throw new Error("You can only delete tasks you created. A Manager or Admin can delete other tasks.");
   const { error } = await client.from("tasks").delete().eq("id", id);
   if (error) throw error;
+  await recordActivity("Deleted a task", "task", id, {task_name:task?.name || "Task"});
   await refresh();
 }
 export async function setOccurrence(taskId, dateKey, status) {
@@ -246,6 +274,8 @@ export async function setOperationCompletion(taskId, dateKey, operationId, compl
       .eq("occurrence_id", occurrenceId).eq("operation_id", operationId);
     if (error) throw error;
   }
+  const operation = (task.operations || []).find(o => o.id === operationId);
+  await recordActivity(completed ? "Completed a task step" : "Reopened a task step", "task_operation", operationId, {task_id:taskId,task_name:task.name,step_name:operation?.name || "Step",date:dateKey});
   await refresh();
   const updated = state.tasks.find(t => t.id === taskId);
   const required = (updated?.operations || []).filter(o => o.required);

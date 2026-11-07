@@ -164,8 +164,12 @@ function renderPeople() {
   $("peopleGrid").innerHTML=people.length?people.map(p=>`<article class="person-card"><div class="person-avatar" style="background:${p.color}">${esc(p.name.slice(0,1).toUpperCase())}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)} · ${p.accountId?"Account linked":"Member profile"}</p></article>`).join(""):empty("Start with your people.","Add member profiles now. Accounts and invitations can be linked later.");
 }
 function renderLedger() {
-  const entries=Store.getState().ledger;
-  $("ledgerList").innerHTML=entries.length?entries.map(e=>`<div class="ledger-row"><div class="ledger-symbol">↗</div><div class="ledger-text"><strong>${esc(e.action)}</strong>${e.detail?` · ${esc(e.detail)}`:""}<div class="ledger-time">${new Date(e.at).toLocaleString()}</div></div></div>`).join(""):empty("Your workspace starts here.","Changes and completed work will appear in this activity history.");
+  const entries=Cloud.getActivity();
+  $("ledgerList").innerHTML=entries.length?entries.map(e=>{
+    const detail=e.detail||{};
+    const summary=detail.task_name||detail.name||detail.step_name||"";
+    return `<div class="ledger-row"><div class="ledger-symbol">↗</div><div class="ledger-text"><strong>${esc(e.action)}</strong>${summary?` · ${esc(summary)}`:""}<div class="ledger-time">${esc(e.actorName||"Household member")} · ${new Date(e.created_at).toLocaleString()}</div></div></div>`;
+  }).join(""):empty("Your workspace starts here.","New changes and completed work will appear here as your household uses WIWY.");
 }
 function renderCalendar() {
   const date=new Date(); const d=keyDate(date); $("calendarDate").textContent=dateLabel(date);
