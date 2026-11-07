@@ -62,12 +62,43 @@ function setView(view, fromBack=false) {
   render();
 }
 function goBack() { const previous=viewHistory.pop()||"today"; setView(previous,true); }
+
+function askWIWYConfirm(title, message, acceptLabel="Confirm") {
+  return new Promise(resolve => {
+    const dialog=$("wiwyConfirmDialog");
+    $("wiwyConfirmTitle").textContent=title;
+    $("wiwyConfirmMessage").textContent=message;
+    $("wiwyConfirmAccept").textContent=acceptLabel;
+    const finish=value=>{dialog.close();$("wiwyConfirmAccept").removeEventListener("click",yes);$("wiwyConfirmCancel").removeEventListener("click",no);dialog.removeEventListener("cancel",cancel);resolve(value);};
+    const yes=()=>finish(true), no=()=>finish(false), cancel=e=>{e.preventDefault();finish(false);};
+    $("wiwyConfirmAccept").addEventListener("click",yes);
+    $("wiwyConfirmCancel").addEventListener("click",no);
+    dialog.addEventListener("cancel",cancel);
+    dialog.showModal();
+  });
+}
+function openTaskDetails(task) {
+  if(!task)return;
+  const occurrence=task.occurrences?.[keyDate()];
+  const names=(task.assigneeIds||[]).map(personName).join(", ")||"Unassigned";
+  const steps=(task.operations||[]).length
+    ? `<section class="detail-section"><h3>Steps</h3><ul class="detail-steps">${task.operations.map(o=>`<li>${o.completed?"☑":"☐"} ${esc(o.name)}</li>`).join("")}</ul></section>`
+    : "";
+  $("taskDetailTitle").textContent=task.name;
+  $("taskDetailContent").innerHTML=`
+    <section class="detail-section"><h3>Schedule</h3><p>${esc(task.date||keyDate())} · ${esc(timeText(task.start))}${task.end?" – "+esc(timeText(task.end)):""}</p></section>
+    <section class="detail-section"><h3>Assigned to</h3><p>${esc(names)}</p></section>
+    ${task.notes?`<section class="detail-section"><h3>Notes</h3><p class="detail-notes">${esc(task.notes)}</p></section>`:""}
+    ${steps}
+    <section class="detail-section"><h3>Status</h3><p>${occurrence?.status==="completed"?"Completed":occurrence?.status==="progress"?"In progress":statusFor(task)==="late"?"Needs a start":"Scheduled"}</p></section>`;
+  $("taskDetailDialog").showModal();
+}
 function renderToday() {
   const state={...Store.getState(), ...Cloud.getState()}, tasks=todayTasks();
   const done=tasks.filter(t=>statusFor(t)==="done").length, progress=tasks.filter(t=>statusFor(t)==="progress").length, late=tasks.filter(t=>statusFor(t)==="late").length;
   $("scheduledCount").textContent=tasks.length; $("completedCount").textContent=done; $("progressCount").textContent=progress; $("notStartedCount").textContent=late;
   $("dateLabel").textContent=dateLabel().toUpperCase(); $("greeting").textContent=new Date().getHours()<12?"Good morning. Here's the shape of the day.":new Date().getHours()<17?"A clear plan for the rest of the day.":"Let's bring the day home.";
-  $("todayAgenda").innerHTML=tasks.length?tasks.map(t=>`<div class="agenda-item"><div class="agenda-time">${timeText(t.start)}</div><div class="agenda-stripe" style="--person-color:${personColor((t.assigneeIds||[])[0])}"></div><div><div class="agenda-name">${esc(t.name)}</div><div class="agenda-meta">${esc((t.assigneeIds||[]).map(personName).join(", ")||"Unassigned")}${t.end?" · until "+timeText(t.end):""}</div></div><span class="status-dot ${statusFor(t)}" title="${statusFor(t)}"></span></div>`).join(""):empty("Nothing scheduled yet","Create a task and it will appear here.");
+  $("todayAgenda").innerHTML=tasks.length?tasks.map(t=>`<button type="button" class="agenda-item agenda-task-button" data-agenda-task="${t.id}"><span class="agenda-time">${timeText(t.start)}</span><div class="agenda-stripe" style="--person-color:${personColor((t.assigneeIds||[])[0])}"></div><div><div class="agenda-name">${esc(t.name)}</div><div class="agenda-meta">${esc((t.assigneeIds||[]).map(personName).join(", ")||"Unassigned")}${t.end?" · until "+timeText(t.end):""}</div></div><span class="status-dot ${statusFor(t)}" title="${statusFor(t)}"></span></button>`).join(""):empty("Nothing scheduled yet","Create a task and it will appear here.");
   $("householdMini").innerHTML=state.people.length?state.people.map(p=>`<div class="person-mini"><span class="person-dot" style="--person-color:${p.color}"></span><span class="person-name">${esc(p.name)}</span><span class="person-count">${p.role}</span></div>`).join(""):empty("Add your household","Create member profiles to assign responsibilities.");
   const dinner=state.meals.find(m=>Number(m.day)===new Date().getDay());
   $("dinnerPreview").innerHTML=dinner?`<div class="empty-icon">♨</div><div><strong>${esc(dinner.name)}</strong><div class="agenda-meta">${esc(dinner.notes||"Dinner plan")}</div></div>`:`<div class="empty-icon">♨</div><p>No dinner planned yet.</p>`;
@@ -172,6 +203,8 @@ async function saveTaskFromForm() {
 function setup() {
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
   document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.go)));
+  $("todayAgenda").addEventListener("click",e=>{const button=e.target.closest("[data-agenda-task]");if(button)openTaskDetails(Cloud.getState().tasks.find(t=>t.id===button.dataset.agendaTask));});
+  $("closeTaskDetail").onclick=()=>$("taskDetailDialog").close();
   $("pageBack").onclick=goBack;
   $("quickAddTask").onclick=$("newTaskButton").onclick=()=>openTask();
   $("taskRepeat").onchange=()=>{$("weekdayPicker").hidden=$("taskRepeat").value!=="weekdays";};
@@ -180,17 +213,18 @@ function setup() {
   $("operationEditor").addEventListener("click",e=>{const i=e.target.dataset.opRemove;if(i!==undefined){operations.splice(Number(i),1);renderOperations();}});
   $("operationEditor").addEventListener("change",e=>{if(e.target.dataset.opRequired!==undefined)operations[Number(e.target.dataset.opRequired)].required=e.target.checked;if(e.target.dataset.opName!==undefined)operations[Number(e.target.dataset.opName)].name=e.target.value;});
   $("taskEditor").addEventListener("submit",e=>{e.preventDefault();saveTaskFromForm();});
-  $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&confirm("Delete this task? Its task definition will be removed.")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
+  $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&await askWIWYConfirm("Delete task?","This removes the task definition. This action cannot be undone.","Delete task")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
   $("taskList").addEventListener("click",async e=>{
     const edit=e.target.dataset.editTask;if(edit)openTask(Cloud.getState().tasks.find(t=>t.id===edit));
     const complete=e.target.dataset.complete;
     if(complete){const task=Cloud.getState().tasks.find(t=>t.id===complete);try{
-      if(task.operations?.length){if(!confirm("Are all steps for this task complete? Select OK to mark every step and complete the task."))return;await Cloud.completeAllStepsAndTask(complete,keyDate());}
+      if(task.operations?.length>=2){if(!await askWIWYConfirm("Complete this task?","Are all steps for this task complete? Confirming will mark every step complete.","Complete task"))return;await Cloud.completeAllStepsAndTask(complete,keyDate());}
+      else if(task.operations?.length===1){await Cloud.completeAllStepsAndTask(complete,keyDate());}
       else await Cloud.setOccurrence(complete,keyDate(),"completed");
       render();toast("✓ Task completed for everyone.");
     }catch(error){toast("Could not complete task: "+error.message);}}
     const reopen=e.target.dataset.reopenTask;
-    if(reopen&&confirm("Reopen this task and clear its step checkmarks?")){try{await Cloud.reopenTask(reopen,keyDate());render();toast("Task reopened.");}catch(error){toast("Could not reopen task: "+error.message);}}
+    if(reopen&&await askWIWYConfirm("Reopen task?","This will clear the completed steps and return the task to not started.","Reopen task")){try{await Cloud.reopenTask(reopen,keyDate());render();toast("Task reopened.");}catch(error){toast("Could not reopen task: "+error.message);}}
   });
   $("taskList").addEventListener("change",async e=>{
     const taskId=e.target.dataset.stepTask, operationId=e.target.dataset.stepId;
@@ -241,7 +275,7 @@ function setup() {
     if (action === "account") { setView("settings"); toast("Account settings will be expanded in a later update."); }
     if (action === "household") { setView("settings"); $("settingsWorkspace").focus(); }
     if (action === "signout") {
-      if (!confirm("Sign out of WIWY on this device?")) return;
+      if (!await askWIWYConfirm("Sign out?","Sign out of WIWY on this device?","Sign out")) return;
       try { await window.WIWY_AUTH?.client?.auth.signOut(); location.reload(); }
       catch(error) { toast("Could not sign out: " + error.message); }
     }

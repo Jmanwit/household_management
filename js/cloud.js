@@ -86,6 +86,7 @@ export async function initialize(authClient, activeWorkspace, activeMembership, 
     .on("postgres_changes", { event:"*", schema:"public", table:"task_occurrences", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_assignments" }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_operations" }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"task_operation_completions", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .subscribe();
   // Polling is a fallback if Realtime is not enabled for these tables.
   refreshTimer = setInterval(() => refreshQuietly(), 20000);
@@ -236,7 +237,7 @@ export async function setOperationCompletion(taskId, dateKey, operationId, compl
     throw new Error("This task is already completed. Ask its creator or a Manager/Admin to reopen it before changing steps.");
   if (completed) {
     const { error } = await client.from("task_operation_completions").upsert({
-      occurrence_id:occurrenceId, operation_id:operationId,
+      workspace_id:workspace.id, occurrence_id:occurrenceId, operation_id:operationId,
       completed_at:new Date().toISOString(), completed_by:user.id
     }, {onConflict:"occurrence_id,operation_id"});
     if (error) throw error;
@@ -260,7 +261,7 @@ export async function completeAllStepsAndTask(taskId, dateKey) {
   if (!task || !canCompleteTask(task)) throw new Error("You must be assigned to this task to complete it.");
   const occurrenceId = task.occurrences?.[dateKey]?.id;
   if (!occurrenceId) throw new Error("The task occurrence has not been created yet. Refresh and try again.");
-  const rows = (task.operations || []).map(o => ({occurrence_id:occurrenceId,operation_id:o.id,completed_at:new Date().toISOString(),completed_by:user.id}));
+  const rows = (task.operations || []).map(o => ({workspace_id:workspace.id,occurrence_id:occurrenceId,operation_id:o.id,completed_at:new Date().toISOString(),completed_by:user.id}));
   if (rows.length) {
     const { error } = await client.from("task_operation_completions").upsert(rows,{onConflict:"occurrence_id,operation_id"});
     if (error) throw error;
