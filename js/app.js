@@ -39,12 +39,20 @@ function personName(id) { return person(id)?.name || "Unassigned"; }
 function personColor(id) { return person(id)?.color || "#6f8876"; }
 function timeText(t) { if(!t)return "Anytime"; const [h,m]=t.split(":").map(Number); const d=new Date();d.setHours(h,m);return d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}); }
 function empty(title,desc) { return `<div class="empty-state"><strong>${title}</strong>${desc}</div>`; }
+function closeSidebar() {
+  $("sidebar").classList.remove("open");
+  $("sidebarBackdrop").classList.remove("visible");
+}
+function openSidebar() {
+  $("sidebar").classList.add("open");
+  $("sidebarBackdrop").classList.add("visible");
+}
 function setView(view) {
   currentView=view;
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`view-${view}`));
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   $("pageTitle").textContent={today:"Today",calendar:"Calendar",tasks:"Tasks",meals:"Meals",groceries:"Groceries",people:"People",ledger:"Activity",settings:"Settings"}[view]||"Today";
-  $("sidebar").classList.remove("open");
+  closeSidebar();
   render();
 }
 function renderToday() {
@@ -156,7 +164,12 @@ function setup() {
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
   $("awayEditor").addEventListener("submit",e=>{e.preventDefault();const scope=$("awayScope").value;Store.setAway({scope,personId:scope==="person"?$("awayPerson").value:null,duration:$("awayDuration").value,enabledAt:new Date().toISOString()});$("awayDialog").close();render();toast("Away mode enabled.");});
   $("turnOffAway").onclick=()=>{Store.setAway(null);$("awayDialog").close();render();toast("Away mode turned off.");};
-  $("mobileMenu").onclick=()=>$("sidebar").classList.toggle("open");
+  $("mobileMenu").onclick=()=> {
+    if ($("sidebar").classList.contains("open")) closeSidebar();
+    else openSidebar();
+  };
+  $("sidebarBackdrop").onclick=closeSidebar;
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeSidebar(); });
   $("workspaceButton").onclick=()=>toast("Workspace switching will be added with account and invitation support.");
   $("notificationButton").onclick=()=>toast("Notifications are planned for the next build stage.");
   $("profileButton").onclick=()=>toast("Account sign-in will be added with shared workspace sync.");
