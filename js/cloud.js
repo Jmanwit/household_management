@@ -157,7 +157,11 @@ async function replaceChildren(taskId, task, assigneeIds) {
   const { error: delOpsError } = await client.from("task_operations").delete().eq("task_id", taskId);
   if (delOpsError) throw delOpsError;
   const ops = (task.operations || []).filter(o => String(o.name || "").trim()).map((o,i) => ({
-    task_id:taskId,label:String(o.name).trim(),sort_order:i,is_required:o.required !== false
+    workspace_id: workspace.id,
+    task_id:taskId,
+    label:String(o.name).trim(),
+    sort_order:i,
+    is_required:o.required !== false
   }));
   if (ops.length) {
     const { error } = await client.from("task_operations").insert(ops);

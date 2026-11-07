@@ -122,6 +122,7 @@ function populatePeopleSelects() {
 function openTask(task=null) {
   populatePeopleSelects(); $("taskEditor").reset(); operations=[]; selectedDays=new Set();
   $("taskId").value=task?.id||""; $("taskDialogTitle").textContent=task?"Edit task":"Create a task";
+  $("taskFormError").hidden=true; $("taskFormError").textContent="";
   $("taskName").value=task?.name||""; 
   const assigned=new Set(task?.assigneeIds||[]);
   if(!task && !Cloud.canAssignAnyone() && Cloud.getMembership()?.member_profile_id) assigned.add(Cloud.getMembership().member_profile_id);
@@ -143,8 +144,9 @@ async function saveTaskFromForm() {
   if(repeat==="weekdays"&&!selectedDays.size){toast("Choose at least one weekday.");return false;}
   const task={id:id||undefined,name:$("taskName").value.trim(),assigneeIds:[...document.querySelectorAll("[data-assignee-option]:checked")].map(o=>o.value),repeat,weekdays:repeat==="weekdays"?[...selectedDays]:[],date:repeat==="once"?keyDate():null,start:$("taskStart").value||null,end:$("taskEnd").value||null,operations,notes:$("taskNotes").value.trim()};
   if(!task.name)return false;
+  const errorBox=$("taskFormError");errorBox.hidden=true;errorBox.textContent="";
   try { await Cloud.saveTask(task); $("taskDialog").close(); toast("Task saved and shared."); render(); return true; }
-  catch(error) { toast("Could not save task: "+error.message); return false; }
+  catch(error) { errorBox.textContent="Could not save task: "+error.message; errorBox.hidden=false; return false; }
 }
 function setup() {
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
@@ -159,8 +161,8 @@ function setup() {
   $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&confirm("Delete this task? Its task definition will be removed.")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
   $("taskList").addEventListener("click",async e=>{const id=e.target.dataset.editTask;if(id)openTask(Cloud.getState().tasks.find(t=>t.id===id));const complete=e.target.dataset.complete;if(complete){try{await Cloud.setOccurrence(complete,keyDate(),"completed");render();toast("Task completed for everyone.");}catch(error){toast("Could not complete task: "+error.message);}}});
   document.querySelectorAll("[data-task-filter]").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.taskFilter;document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x===b));renderTasks();});
-  $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personDialog").showModal();};
-  $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(name){try{await Cloud.addPerson({name,color:$("personColor").value,role:$("personRole").value});$("personDialog").close();populatePeopleSelects();render();toast("Member profile added.");}catch(error){toast("Could not add member: "+error.message);}}});
+  $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
+  $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(name){const errorBox=$("personFormError");errorBox.hidden=true;errorBox.textContent="";try{await Cloud.addPerson({name,color:$("personColor").value});$("personDialog").close();populatePeopleSelects();render();toast("Member profile added.");}catch(error){errorBox.textContent="Could not add person: "+error.message;errorBox.hidden=false;}}});
   $("addMealButton").onclick=()=>{$("mealEditor").reset();$("mealDialog").showModal();};
   $("mealEditor").addEventListener("submit",e=>{e.preventDefault();Store.addMeal({day:$("mealDay").value,name:$("mealName").value.trim(),notes:$("mealNotes").value.trim()});$("mealDialog").close();render();toast("Meal added.");});
   $("mealList").addEventListener("click",e=>{const id=e.target.dataset.deleteMeal;if(id){Store.update(s=>s.meals=s.meals.filter(m=>m.id!==id),"Removed a meal","");render();}});
