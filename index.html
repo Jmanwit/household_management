@@ -128,6 +128,7 @@
     <form method="dialog" id="taskEditor">
       <div class="modal-head"><div><span class="eyebrow">TASK BUILDER</span><h2 id="taskDialogTitle">Create a task</h2></div><button class="close-button" value="cancel" aria-label="Close">×</button></div>
       <input type="hidden" id="taskId">
+      <div id="taskFormError" class="form-error" role="alert" hidden></div>
       <label>Task name<input id="taskName" required maxlength="100" placeholder="e.g. Kitchen reset"></label>
       <div class="form-row"><label>Assigned members<div id="taskAssigneeOptions" class="assignee-options" aria-describedby="assigneeHelp"></div><span id="assigneeHelp" class="label-hint">Choose everyone who shares responsibility for this task. Any one assigned person can complete it.</span></label><label>Repeat<select id="taskRepeat"><option value="once">One time</option><option value="daily">Every day</option><option value="weekdays">Selected weekdays</option></select></label></div>
       <div id="weekdayPicker" class="weekday-picker" hidden><button type="button" data-day="1">M</button><button type="button" data-day="2">T</button><button type="button" data-day="3">W</button><button type="button" data-day="4">T</button><button type="button" data-day="5">F</button><button type="button" data-day="6">S</button><button type="button" data-day="0">S</button></div>
@@ -141,7 +142,7 @@
   </dialog>
 
   <dialog id="personDialog" class="modal small-modal">
-    <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button class="close-button" value="cancel">×</button></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
+    <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button class="close-button" value="cancel">×</button></div><div id="personFormError" class="form-error" role="alert" hidden></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
   </dialog>
 
   <dialog id="mealDialog" class="modal small-modal">
