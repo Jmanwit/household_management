@@ -1,0 +1,22 @@
+WIWY FIRST UPLOAD
+
+1. Extract the ZIP on your tablet.
+2. Open the GitHub repository: household_management.
+3. Use Add file > Upload files.
+4. Upload everything INSIDE the extracted wiwy_initial folder to the repository root:
+   index.html
+   manifest.webmanifest
+   service-worker.js
+   README.md
+   NEXT_STEPS.txt
+   css/
+   js/
+   icons/
+   supabase/
+5. Commit changes to main.
+6. Open Settings > Pages and enable Deploy from branch: main / (root).
+
+Do not upload this project into Shack Out Back.
+
+Do not paste your Supabase database password or service-role key into any file.
+The first version uses local browser storage only. Cross-device sync is not active yet.
