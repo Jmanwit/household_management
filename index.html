@@ -81,8 +81,8 @@
       </section>
 
       <section class="view" id="view-calendar">
-        <div class="view-toolbar"><div><p class="muted">See how the day fits together.</p></div><div class="segmented"><button class="selected" data-cal-mode="day">Day</button><button data-cal-mode="week">Week</button></div></div>
-        <div class="panel calendar-panel"><div class="calendar-header"><button class="icon-button" id="prevDay">‹</button><h3 id="calendarDate">Today</h3><button class="icon-button" id="nextDay">›</button></div><div id="calendarGrid" class="calendar-grid"></div></div>
+        <div class="view-toolbar"><div><p class="muted">Choose a date to see the household schedule.</p></div><div class="calendar-view-controls"><div class="segmented"><button class="selected" data-cal-mode="day">Day</button><button data-cal-mode="week">Week</button><button data-cal-mode="month">Month</button></div><button class="secondary-button" id="calendarToday">Today</button></div></div>
+        <div class="panel calendar-panel"><div class="calendar-header"><button class="icon-button" id="prevDay" aria-label="Previous period">‹</button><div class="calendar-heading-center"><button class="secondary-button" id="calendarReturnMonth" hidden>← Month</button><h3 id="calendarDate">Today</h3></div><button class="icon-button" id="nextDay" aria-label="Next period">›</button></div><div id="calendarGrid" class="calendar-grid"></div></div>
       </section>
 
       <section class="view" id="view-tasks">
