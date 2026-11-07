@@ -1,11 +1,11 @@
 import * as Store from "./store.js";
-import { requireAuth } from "./auth.js";
+import { requireAuth, renameActiveWorkspace, getSignedInUser } from "./auth.js";
 
 const $ = id => document.getElementById(id);
 const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const shortDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [];
-let toastTimer;
+let toastTimer;\nlet authenticatedWorkspace = null;\nlet signedInUser = null;
 
 function toast(message) {
   $("toast").textContent = message; $("toast").classList.add("show");
@@ -102,8 +102,9 @@ function renderCalendar() {
   });
 }
 function render() {
-  $("workspaceName").textContent=Store.getState().workspace.name;
-  $("settingsWorkspace").value=Store.getState().workspace.name;
+  const visibleWorkspaceName = authenticatedWorkspace?.name || Store.getState().workspace.name;
+  $("workspaceName").textContent = visibleWorkspaceName;
+  $("settingsWorkspace").value = visibleWorkspaceName;
   renderToday();renderTasks();renderMeals();renderGroceries();renderPeople();renderLedger();renderCalendar();
   const away=Store.getState().workspace.away;
   $("awayButton").innerHTML=away?`☼ <span class="desktop-only">Away mode on</span>`:`☼ <span class="desktop-only">Away mode</span>`;
@@ -157,7 +158,16 @@ function setup() {
   $("groceryForm").onsubmit=e=>{e.preventDefault();const name=$("groceryInput").value.trim();if(name){Store.addGrocery({name,category:$("groceryCategory").value});$("groceryInput").value="";renderGroceries();}};
   $("groceryList").addEventListener("change",e=>{const id=e.target.dataset.grocery;if(id){Store.toggleGrocery(id);renderGroceries();}});
   $("clearGroceries").onclick=()=>{Store.clearCompletedGroceries();renderGroceries();};
-  $("saveWorkspace").onclick=()=>{Store.saveWorkspaceName($("settingsWorkspace").value.trim()||"Our Home");render();toast("Workspace name saved.");};
+  $("saveWorkspace").onclick=async()=>{
+    const proposed = $("settingsWorkspace").value.trim();
+    if (!proposed) { toast("Enter a workspace name."); return; }
+    try {
+      authenticatedWorkspace = await renameActiveWorkspace(proposed);
+      Store.saveWorkspaceName(proposed);
+      render();
+      toast("Workspace name saved.");
+    } catch (error) { toast("Could not save workspace name: " + error.message); }
+  };
   $("exportData").onclick=()=>{const blob=new Blob([Store.exportState()],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wiwy-backup-"+keyDate()+".json";a.click();URL.revokeObjectURL(a.href);};
   $("importData").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{Store.importState(JSON.parse(await f.text()));render();toast("Backup imported.");}catch(err){alert(err.message);}e.target.value="";};
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
@@ -171,7 +181,29 @@ function setup() {
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSidebar(); });
   $("workspaceButton").onclick=()=>toast("Workspace switching will be added with account and invitation support.");
   $("notificationButton").onclick=()=>toast("Notifications are planned for the next build stage.");
-  $("profileButton").onclick=async()=>{if(confirm("Sign out of WIWY on this device?")){try{await window.WIWY_AUTH?.client?.auth.signOut();location.reload();}catch(error){toast("Could not sign out: "+error.message);}}};
+  $("profileButton").onclick=()=>{
+    const menu = $("accountMenu");
+    menu.hidden = !menu.hidden;
+    $("profileButton").setAttribute("aria-expanded", String(!menu.hidden));
+  };
+  $("accountMenu").addEventListener("click", async e => {
+    const action = e.target.closest("[data-account-action]")?.dataset.accountAction;
+    if (!action) return;
+    $("accountMenu").hidden = true;
+    if (action === "account") { setView("settings"); toast("Account settings will be expanded in a later update."); }
+    if (action === "household") { setView("settings"); $("settingsWorkspace").focus(); }
+    if (action === "signout") {
+      if (!confirm("Sign out of WIWY on this device?")) return;
+      try { await window.WIWY_AUTH?.client?.auth.signOut(); location.reload(); }
+      catch(error) { toast("Could not sign out: " + error.message); }
+    }
+  });
+  document.addEventListener("click", e => {
+    if (!$("accountMenu").hidden && !e.target.closest("#profileButton") && !e.target.closest("#accountMenu")) {
+      $("accountMenu").hidden = true;
+      $("profileButton").setAttribute("aria-expanded", "false");
+    }
+  });
   document.querySelectorAll("[data-cal-mode]").forEach(b=>b.onclick=()=>{calendarMode=b.dataset.calMode;document.querySelectorAll("[data-cal-mode]").forEach(x=>x.classList.toggle("selected",x===b));toast(calendarMode==="week"?"Week view is coming in the next calendar pass.":"Day view selected.");});
   $("prevDay").onclick=$("nextDay").onclick=()=>toast("Date navigation is coming in the next calendar pass.");
   render();
@@ -181,6 +213,15 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) naviga
   try {
     const auth = await requireAuth();
     window.WIWY_AUTH = auth;
+    authenticatedWorkspace = auth.workspace;
+    signedInUser = await getSignedInUser();
+    const avatar = document.getElementById("profileButton");
+    if (avatar) {
+      avatar.textContent = "♙";
+      avatar.setAttribute("aria-label", "Account menu");
+      avatar.setAttribute("aria-haspopup", "true");
+      avatar.setAttribute("aria-expanded", "false");
+    }
     setup();
     toast("Signed in. Workspace is ready.");
   } catch (error) {
