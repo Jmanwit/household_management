@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#151a18">
+  <meta name="description" content="Wherever I'm With You — a shared home and life organizer.">
+  <title>WIWY · Wherever I'm With You</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">W</div>
+        <div><div class="brand-name">WIWY</div><div class="brand-subtitle">Wherever I'm With You</div></div>
+      </div>
+      <div class="workspace-switch">
+        <span class="eyebrow">WORKSPACE</span>
+        <button class="workspace-button" id="workspaceButton"><span class="workspace-dot"></span><span id="workspaceName">Our Home</span><span class="chevron">⌄</span></button>
+      </div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="today"><span class="nav-icon">◷</span>Today</button>
+        <button class="nav-item" data-view="calendar"><span class="nav-icon">▦</span>Calendar</button>
+        <button class="nav-item" data-view="tasks"><span class="nav-icon">☷</span>Tasks</button>
+        <button class="nav-item" data-view="meals"><span class="nav-icon">♨</span>Meals</button>
+        <button class="nav-item" data-view="groceries"><span class="nav-icon">⌑</span>Groceries</button>
+        <button class="nav-item" data-view="people"><span class="nav-icon">♙</span>People</button>
+        <button class="nav-item" data-view="ledger"><span class="nav-icon">≡</span>Activity</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span>Settings</button>
+        <div class="sidebar-note">A little more organized.<br>A lot more together.</div>
+      </div>
+    </aside>
+    <button class="sidebar-backdrop" id="sidebarBackdrop" aria-label="Close navigation" tabindex="-1"></button>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="page-back" id="pageBack" aria-label="Go back" title="Back" hidden>←</button><button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
+        <div><div class="eyebrow" id="dateLabel">YOUR HOUSEHOLD</div><h1 id="pageTitle">Today</h1></div>
+        <div class="top-actions">
+          <button class="icon-button" id="awayButton" title="Away mode synchronization is coming later" disabled>☼ <span class="desktop-only">Away mode</span></button>
+          <button class="icon-button notification-button" id="notificationButton" title="Notifications">♧<i></i></button>
+          <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false">♙</button>
+          <div id="accountMenu" class="account-menu" hidden>
+            <div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div>
+            <button type="button" data-account-action="account">Account settings</button>
+            <button type="button" data-account-action="household">Household settings</button>
+            <button type="button" data-account-action="signout">Sign out</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="view active" id="view-today">
+        <div class="welcome-row">
+          <div><p class="muted greeting" id="greeting">A good day starts with a clear plan.</p><h2>Today, together.</h2></div>
+          <button class="primary-button" id="quickAddTask">＋ <span>Add task</span></button>
+        </div>
+        <div class="summary-grid">
+          <article class="summary-card" data-summary-filter="scheduled"><div class="summary-label">ON THE SCHEDULE</div><div class="summary-value" id="scheduledCount">0</div><div class="summary-foot">tasks and routines today</div></article>
+          <article class="summary-card" data-summary-filter="completed"><div class="summary-label">COMPLETED</div><div class="summary-value" id="completedCount">0</div><div class="summary-foot">finished together</div></article>
+          <article class="summary-card" data-summary-filter="progress"><div class="summary-label">IN PROGRESS</div><div class="summary-value" id="progressCount">0</div><div class="summary-foot">currently underway</div></article>
+          <article class="summary-card" data-summary-filter="late"><div class="summary-label">NEEDS A START</div><div class="summary-value" id="notStartedCount">0</div><div class="summary-foot">scheduled and not started</div></article>
+        </div>
+        <div class="content-grid">
+          <section class="panel agenda-panel">
+            <div class="panel-heading"><div><span class="eyebrow">THE PLAN</span><h3>Today's agenda</h3></div><button class="text-button" data-go="calendar">Full calendar →</button></div>
+            <div id="todayAgenda" class="agenda-list"></div>
+          </section>
+          <section class="panel side-panel">
+            <div class="panel-heading"><div><span class="eyebrow">AT A GLANCE</span><h3>Household</h3></div></div>
+            <div id="householdMini" class="people-mini"></div>
+            <div class="panel-divider"></div>
+            <div class="panel-heading compact"><div><span class="eyebrow">DINNER</span><h3>On the menu</h3></div><button class="text-button" data-go="meals">Edit</button></div>
+            <div id="dinnerPreview" class="dinner-preview"><div class="empty-icon">♨</div><p>No dinner planned yet.</p></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-calendar">
+        <div class="view-toolbar"><div><p class="muted">See how the day fits together.</p></div><div class="segmented"><button class="selected" data-cal-mode="day">Day</button><button data-cal-mode="week">Week</button></div></div>
+        <div class="panel calendar-panel"><div class="calendar-header"><button class="icon-button" id="prevDay">‹</button><h3 id="calendarDate">Today</h3><button class="icon-button" id="nextDay">›</button></div><div id="calendarGrid" class="calendar-grid"></div></div>
+      </section>
+
+      <section class="view" id="view-tasks">
+        <div class="view-toolbar"><p class="muted">Shared household tasks. One assigned member can complete a shared task for everyone.</p><button class="primary-button" id="newTaskButton">＋ <span>New task</span></button></div>
+        <div class="filter-row"><button class="filter-chip selected" data-task-filter="all">All tasks</button><button class="filter-chip" data-task-filter="active">Active</button><button class="filter-chip" data-task-filter="recurring">Recurring</button></div>
+        <div class="panel"><div id="taskList" class="task-list"></div></div>
+      </section>
+
+      <section class="view" id="view-meals">
+        <div class="view-toolbar"><p class="muted">Plan the food, prep, and shared moments around the table.</p><button class="primary-button" id="addMealButton" disabled>＋ <span>Add meal</span></button></div><p class="sync-note">Meal-plan synchronization is coming in a later update. Editing is temporarily paused so devices do not develop conflicting copies.</p>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">THIS WEEK</span><h3>Meal plan</h3></div></div><div id="mealList" class="meal-list"></div></div>
+      </section>
+
+      <section class="view" id="view-groceries">
+        <div class="view-toolbar"><p class="muted">One shared list. Fewer forgotten things.</p></div>
+        <p class="sync-note">Grocery-list synchronization is coming in a later update. Editing is temporarily paused so everyone sees one consistent list.</p><form id="groceryForm" class="add-inline"><input id="groceryInput" placeholder="Grocery sync coming soon" disabled autocomplete="off"><select id="groceryCategory" disabled><option>General</option><option>Produce</option><option>Meat & seafood</option><option>Dairy</option><option>Pantry</option><option>Household</option></select><button class="primary-button" disabled>Add</button></form>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">SHOPPING LIST</span><h3 id="groceryHeading">Items to pick up</h3></div><button class="text-button" id="clearGroceries" disabled>Clear completed</button></div><div id="groceryList" class="grocery-list"></div></div>
+      </section>
+
+      <section class="view" id="view-people">
+        <div class="view-toolbar"><p class="muted">People are part of a workspace whether or not they have an account.</p><button class="primary-button" id="addPersonButton">＋ <span>Add person</span></button></div>
+        <div id="peopleGrid" class="people-grid"></div>
+      </section>
+
+      <section class="view" id="view-ledger">
+        <div class="view-toolbar"><p class="muted">A shared record of what changed and when.</p></div>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">WORKSPACE HISTORY</span><h3>Recent activity</h3></div></div><div id="ledgerList" class="ledger-list"></div></div>
+      </section>
+
+      <section class="view" id="view-settings">
+        <div class="settings-grid">
+          <div class="panel settings-card"><span class="eyebrow">WORKSPACE</span><h3>Workspace settings</h3><label>Workspace name<input id="settingsWorkspace" value="Our Home"></label><button class="primary-button" id="saveWorkspace">Save name</button></div>
+          <div class="panel settings-card"><span class="eyebrow">DATA</span><h3>Backup & restore</h3><p class="muted">Export a copy of your workspace data or restore from a previous export.</p><div class="button-row"><button class="secondary-button" id="exportData">Export JSON</button><label class="file-button">Import JSON<input type="file" id="importData" accept="application/json"></label></div></div>
+          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Early access foundation 0.1.0</div></div>
+        </div>
+      </section>
+
+      <footer class="app-footer">Wherever I'm With You <span>·</span> A little more organized. A lot more together.</footer>
+    </main>
+  </div>
+
+  <dialog id="taskDialog" class="modal">
+    <form method="dialog" id="taskEditor">
+      <div class="modal-head"><div><span class="eyebrow">TASK BUILDER</span><h2 id="taskDialogTitle">Create a task</h2></div><button class="close-button" value="cancel" aria-label="Close">×</button></div>
+      <input type="hidden" id="taskId">
+      <div id="taskFormError" class="form-error" role="alert" hidden></div>
+      <label>Task name<input id="taskName" required maxlength="100" placeholder="e.g. Kitchen reset"></label>
+      <div class="form-row"><label>Assigned members<div id="taskAssigneeOptions" class="assignee-options" aria-describedby="assigneeHelp"></div><span id="assigneeHelp" class="label-hint">Choose everyone who shares responsibility for this task. Any one assigned person can complete it.</span></label><label>Repeat<select id="taskRepeat"><option value="once">One time</option><option value="daily">Every day</option><option value="weekdays">Selected weekdays</option></select></label></div>
+      <div id="weekdayPicker" class="weekday-picker" hidden><button type="button" data-day="1">M</button><button type="button" data-day="2">T</button><button type="button" data-day="3">W</button><button type="button" data-day="4">T</button><button type="button" data-day="5">F</button><button type="button" data-day="6">S</button><button type="button" data-day="0">S</button></div>
+      <div class="form-row"><label>Start time<input type="time" id="taskStart"></label><label>End time<input type="time" id="taskEnd"></label></div>
+      <label>Task steps <span class="label-hint">Optional · add the steps that define done</span></label>
+      <div id="operationEditor" class="operation-editor"></div>
+      <div class="operation-add"><input id="newOperation" placeholder="Add a step…"><button type="button" class="secondary-button" id="addOperation">＋ Add step</button></div>
+      <label>Notes<textarea id="taskNotes" rows="2" placeholder="Helpful details, supplies, or instructions…"></textarea></label>
+      <div class="modal-actions"><button type="button" class="secondary-button" id="deleteTaskButton" hidden>Delete task</button><span></span><button class="primary-button" id="saveTaskButton" value="save">Save task</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="personDialog" class="modal small-modal">
+    <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button class="close-button" value="cancel">×</button></div><div id="personFormError" class="form-error" role="alert" hidden></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
+  </dialog>
+
+  <dialog id="mealDialog" class="modal small-modal">
+    <form method="dialog" id="mealEditor"><div class="modal-head"><div><span class="eyebrow">MEAL PLAN</span><h2>Add a meal</h2></div><button class="close-button" value="cancel">×</button></div><label>Day<select id="mealDay"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></label><label>Meal<input id="mealName" required placeholder="e.g. Roast chicken and potatoes"></label><label>Prep notes<textarea id="mealNotes" rows="2"></textarea></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Save meal</button></div></form>
+  </dialog>
+
+  <dialog id="awayDialog" class="modal small-modal">
+    <form method="dialog" id="awayEditor"><div class="modal-head"><div><span class="eyebrow">FLEXIBLE BY DESIGN</span><h2>Away mode</h2></div><button class="close-button" value="cancel">×</button></div><p class="muted">Pause routine reminders without completing or deleting tasks. Your schedule and history stay intact.</p><label>Apply to<select id="awayScope"><option value="workspace">Everyone in this workspace</option><option value="person">One person</option></select></label><label id="awayPersonWrap" hidden>Person<select id="awayPerson"></select></label><label>Resume<select id="awayDuration"><option value="tomorrow">Tomorrow at 5:00 AM</option><option value="indefinite">Manually turn off</option></select></label><div class="modal-actions"><button type="button" class="secondary-button" id="turnOffAway">Turn off</button><span></span><button class="primary-button" value="save">Enable away mode</button></div></form>
+  </dialog>
+
+
+  <section id="authGate" class="auth-gate" hidden>
+    <div class="auth-card">
+      <div class="brand auth-brand"><div class="brand-mark">W</div><div><div class="brand-name">WIWY</div><div class="brand-subtitle">Wherever I'm With You</div></div></div>
+      <span class="eyebrow">YOUR PRIVATE WORKSPACE</span>
+      <h1>Welcome home.</h1>
+      <p class="auth-intro">Sign in or create your administrator account to set up your WIWY workspace.</p>
+      <label>Your name<input id="authName" type="text" placeholder="Name" autocomplete="name"></label>
+      <label>Email address<input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email"></label>
+      <label>Password<input id="authPassword" type="password" placeholder="At least 8 characters" autocomplete="current-password"></label>
+      <div class="auth-actions"><button class="primary-button" id="authSignIn" type="button">Sign in</button><button class="secondary-button" id="authSignUp" type="button">Create account</button></div>
+      <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./js/app.js"></script>
+
+  <dialog id="taskDetailDialog" class="modal task-detail-modal">
+    <div class="modal-head"><div><span class="eyebrow">TASK DETAILS</span><h2 id="taskDetailTitle">Task</h2></div><button class="close-button" id="closeTaskDetail" aria-label="Close">×</button></div>
+    <div id="taskDetailContent"></div>
+  </dialog>
+  <dialog id="wiwyConfirmDialog" class="modal confirm-modal">
+    <div class="modal-head"><div><span class="eyebrow">PLEASE CONFIRM</span><h2 id="wiwyConfirmTitle">Confirm action</h2></div></div>
+    <p id="wiwyConfirmMessage"></p>
+    <div class="modal-actions"><button class="secondary-button" id="wiwyConfirmCancel">Cancel</button><button class="primary-button" id="wiwyConfirmAccept">Confirm</button></div>
+  </dialog>
+</body>
+</html>
