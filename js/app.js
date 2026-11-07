@@ -6,6 +6,9 @@ const $ = id => document.getElementById(id);
 const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const shortDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [], viewHistory = [];
+let calendarDate = new Date(); calendarDate.setHours(12,0,0,0);
+let calendarReturnToMonth = false;
+let detailDateKey = keyDate();
 let toastTimer;
 let authenticatedWorkspace = null;
 let signedInUser = null;
@@ -77,9 +80,11 @@ function askWIWYConfirm(title, message, acceptLabel="Confirm") {
     dialog.showModal();
   });
 }
-function openTaskDetails(task) {
+async function openTaskDetails(task, date=keyDate()) {
   if(!task)return;
-  const date=keyDate();
+  detailDateKey=date;
+  try { if(taskOccurs(task,date) && !task.occurrences?.[date]?.id) await Cloud.ensureOccurrence(task.id,date); } catch(error) { toast("Could not prepare task occurrence: "+error.message); }
+  task=Cloud.getState().tasks.find(t=>t.id===task.id)||task;
   const occurrence=task.occurrences?.[date];
   const done=occurrence?.status==="completed";
   const names=(task.assigneeIds||[]).map(personName).join(", ")||"Unassigned";
@@ -87,9 +92,9 @@ function openTaskDetails(task) {
   const canEdit=Cloud.canManageTask(task);
   const operations=task.operations||[];
   const steps=operations.length
-    ? `<section class="detail-section"><h3>Steps</h3><ul class="detail-steps">${operations.map(o=>`<li><label class="detail-step ${o.completed?"step-done":""}"><input type="checkbox" data-detail-step-task="${task.id}" data-detail-step-id="${o.id}" ${o.completed?"checked":""} ${!canComplete||done?"disabled":""}><span>${esc(o.name)}</span></label></li>`).join("")}</ul></section>`
+    ? `<section class="detail-section"><h3>Steps</h3><ul class="detail-steps">${operations.map(o=>`<li><label class="detail-step ${o.completedDates?.[date]?"step-done":""}"><input type="checkbox" data-detail-step-task="${task.id}" data-detail-step-date="${date}" data-detail-step-id="${o.id}" ${o.completedDates?.[date]?"checked":""} ${!canComplete||done?"disabled":""}><span>${esc(o.name)}</span></label></li>`).join("")}</ul></section>`
     : "";
-  const status=done?"Completed":occurrence?.status==="progress"?"In progress":statusFor(task)==="late"?"Needs a start":"Scheduled";
+  const status=done?"Completed":occurrence?.status==="progress"?"In progress":statusFor(task,date)==="late"?"Needs a start":"Scheduled";
   $("taskDetailTitle").textContent=task.name;
   $("taskDetailContent").innerHTML=`
     <section class="detail-section"><h3>Schedule</h3><p>${esc(dateLabel(new Date(date+"T12:00:00")))} · ${esc(timeText(task.start))}${task.end?" – "+esc(timeText(task.end)):""}</p></section>
@@ -101,20 +106,22 @@ function openTaskDetails(task) {
       ${done&&canEdit?`<button class="secondary-button" data-detail-reopen="${task.id}">Reopen task</button>`:!done&&canComplete?`<button class="primary-button" data-detail-complete="${task.id}">Mark task complete</button>`:""}
     </div>`;
   $("taskDetailDialog").dataset.taskId=task.id;
+  $("taskDetailDialog").dataset.dateKey=date;
   $("taskDetailDialog").showModal();
 }
 async function completeTaskFromDetails(taskId) {
   const task=Cloud.getState().tasks.find(t=>t.id===taskId); if(!task)return;
+  const date=detailDateKey;
   try {
     if(task.operations?.length>=2){
       if(!await askWIWYConfirm("Complete this task?","Are all steps for this task complete? Confirming will mark every step complete.","Complete task"))return;
-      await Cloud.completeAllStepsAndTask(taskId,keyDate());
+      await Cloud.completeAllStepsAndTask(taskId,date);
     } else if(task.operations?.length===1) {
-      await Cloud.completeAllStepsAndTask(taskId,keyDate());
+      await Cloud.completeAllStepsAndTask(taskId,date);
     } else {
-      await Cloud.setOccurrence(taskId,keyDate(),"completed");
+      await Cloud.setOccurrence(taskId,date,"completed");
     }
-    render(); openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskId)); toast("✓ Task completed for everyone.");
+    render(); await openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskId),date); toast("✓ Task completed for everyone.");
   } catch(error){toast("Could not complete task: "+error.message);}
 }
 
@@ -171,20 +178,50 @@ function renderLedger() {
     return `<div class="ledger-row"><div class="ledger-symbol">↗</div><div class="ledger-text"><strong>${esc(e.action)}</strong>${summary?` · ${esc(summary)}`:""}<div class="ledger-time">${esc(e.actorName||"Household member")} · ${new Date(e.created_at).toLocaleString()}</div></div></div>`;
   }).join(""):empty("Your workspace starts here.","New changes and completed work will appear here as your household uses WIWY.");
 }
-function renderCalendar() {
-  const date=new Date(); const d=keyDate(date); $("calendarDate").textContent=dateLabel(date);
-  const tasks=Cloud.getState().tasks.filter(t=>taskOccurs(t,d));
+function addDays(date,amount){const d=new Date(date);d.setDate(d.getDate()+amount);return d;}
+function formatMonth(date){return date.toLocaleDateString(undefined,{month:"long",year:"numeric"});}
+function tasksForDate(date){
+  const key=keyDate(date);
+  return Cloud.getState().tasks.filter(t=>!t.archived&&taskOccurs(t,key)).sort((x,y)=>(parseTime(x.start)??9999)-(parseTime(y.start)??9999));
+}
+function renderCalendar(){
+  const key=keyDate(calendarDate);
+  document.querySelectorAll("[data-cal-mode]").forEach(b=>b.classList.toggle("selected",b.dataset.calMode===calendarMode));
+  $("calendarReturnMonth").hidden=!(calendarMode==="day"&&calendarReturnToMonth);
+  if(calendarMode==="month"){
+    $("calendarDate").textContent=formatMonth(calendarDate);
+    $("calendarGrid").className="calendar-grid month-grid";
+    const first=new Date(calendarDate.getFullYear(),calendarDate.getMonth(),1,12), offset=first.getDay(), daysInMonth=new Date(first.getFullYear(),first.getMonth()+1,0).getDate();
+    const cells=[];
+    for(let i=0;i<offset;i++)cells.push(`<div class="month-empty"></div>`);
+    for(let n=1;n<=daysInMonth;n++){
+      const d=new Date(first.getFullYear(),first.getMonth(),n,12), k=keyDate(d), tasks=tasksForDate(d), isToday=k===keyDate(), selected=k===key;
+      const dots=tasks.slice(0,5).map(t=>`<i style="--person-color:${personColor(t.assigneeIds?.[0])}"></i>`).join("");
+      cells.push(`<button class="month-day ${isToday?"is-today":""} ${selected?"is-selected":""}" data-month-date="${k}"><span>${n}</span><small>${tasks.length?tasks.length+" task"+(tasks.length===1?"":"s"):""}</small><div class="month-dots">${dots}</div></button>`);
+    }
+    $("calendarGrid").innerHTML=`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="month-weekday">${d}</div>`).join("")}${cells.join("")}`;
+    return;
+  }
+  if(calendarMode==="week"){
+    const start=addDays(calendarDate,-calendarDate.getDay()), days=Array.from({length:7},(_,i)=>addDays(start,i));
+    $("calendarDate").textContent=`${days[0].toLocaleDateString(undefined,{month:"short",day:"numeric"})} – ${days[6].toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}`;
+    $("calendarGrid").className="calendar-grid week-grid";
+    $("calendarGrid").innerHTML=days.map(d=>{
+      const k=keyDate(d), tasks=tasksForDate(d);
+      return `<section class="week-day ${k===keyDate()?"is-today":""}"><button class="week-day-head" data-month-date="${k}"><strong>${shortDays[d.getDay()]}</strong><span>${d.getDate()}</span></button><div class="week-day-tasks">${tasks.length?tasks.map(t=>`<button class="week-task" data-calendar-task="${t.id}" data-task-date="${k}" style="--person-color:${personColor(t.assigneeIds?.[0])}"><strong>${esc(t.name)}</strong><small>${timeText(t.start)}</small></button>`).join(""):`<span class="week-no-tasks">—</span>`}</div></section>`;
+    }).join("");
+    return;
+  }
+  $("calendarDate").textContent=dateLabel(calendarDate);
+  $("calendarGrid").className="calendar-grid day-grid";
+  const tasks=tasksForDate(calendarDate);
   let html="";
   for(let h=6;h<23;h++){
-    html+=`<div class="time-label">${new Date(2000,0,1,h).toLocaleTimeString([],{hour:"numeric"})}</div><div class="time-slot" data-hour="${h}"></div>`;
+    const label=new Date(2000,0,1,h).toLocaleTimeString([],{hour:"numeric"});
+    const items=tasks.filter(t=>Math.floor((parseTime(t.start)??9*60)/60)===h);
+    html+=`<div class="time-label">${label}</div><div class="time-slot" data-hour="${h}">${items.map(t=>`<button type="button" class="calendar-event calendar-event-button" data-calendar-task="${t.id}" data-task-date="${key}" style="--person-color:${personColor(t.assigneeIds?.[0])}"><strong>${esc(t.name)}</strong><small>${timeText(t.start)}${t.end?" – "+timeText(t.end):""} · ${esc((t.assigneeIds||[]).map(personName).join(", ")||"Unassigned")}</small></button>`).join("")}</div>`;
   }
   $("calendarGrid").innerHTML=html;
-  tasks.forEach(t=>{
-    const start=parseTime(t.start)??9*60, end=parseTime(t.end)??start+45;
-    const top=(start-6*60)/60*62, height=Math.max(34,(end-start)/60*62);
-    const slot=$(`calendarGrid`).querySelector(`[data-hour="${Math.max(6,Math.min(22,Math.floor(start/60)))}"]`);
-    if(slot){const ev=document.createElement("button");ev.type="button";ev.className="calendar-event calendar-event-button";ev.dataset.calendarTask=t.id;ev.style.cssText=`top:${(start%60)/60*62}px;height:${Math.min(height,500)}px;--person-color:${personColor((t.assigneeIds||[])[0])}`;ev.innerHTML=`<strong>${esc(t.name)}</strong><small>${timeText(t.start)} · ${esc((t.assigneeIds||[]).map(personName).join(", ")||"Unassigned")}</small>`;slot.appendChild(ev);}
-  });
 }
 function render() {
   const visibleWorkspaceName = authenticatedWorkspace?.name || Store.getState().workspace.name;
@@ -233,14 +270,19 @@ function setup() {
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
   document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.go)));
   $("todayAgenda").addEventListener("click",e=>{const button=e.target.closest("[data-agenda-task]");if(button)openTaskDetails(Cloud.getState().tasks.find(t=>t.id===button.dataset.agendaTask));});
-  $("calendarGrid").addEventListener("click",e=>{const button=e.target.closest("[data-calendar-task]");if(button)openTaskDetails(Cloud.getState().tasks.find(t=>t.id===button.dataset.calendarTask));});
+  $("calendarGrid").addEventListener("click",async e=>{
+    const taskButton=e.target.closest("[data-calendar-task]");
+    if(taskButton){await openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskButton.dataset.calendarTask),taskButton.dataset.taskDate||keyDate(calendarDate));return;}
+    const dayButton=e.target.closest("[data-month-date]");
+    if(dayButton){calendarDate=new Date(dayButton.dataset.monthDate+"T12:00:00");calendarReturnToMonth=calendarMode==="month";calendarMode="day";renderCalendar();}
+  });
   $("taskDetailContent").addEventListener("change",async e=>{
     const taskId=e.target.dataset.detailStepTask, operationId=e.target.dataset.detailStepId;
-    if(taskId&&operationId){try{await Cloud.setOperationCompletion(taskId,keyDate(),operationId,e.target.checked);render();openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskId));const t=Cloud.getState().tasks.find(x=>x.id===taskId);if(t?.occurrences?.[keyDate()]?.status==="completed")toast("✓ All required steps completed. Task finished.");}catch(error){e.target.checked=!e.target.checked;toast("Could not update step: "+error.message);}}
+    if(taskId&&operationId){const date=e.target.dataset.detailStepDate||detailDateKey;try{await Cloud.setOperationCompletion(taskId,date,operationId,e.target.checked);render();await openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskId),date);const t=Cloud.getState().tasks.find(x=>x.id===taskId);if(t?.occurrences?.[date]?.status==="completed")toast("✓ All required steps completed. Task finished.");}catch(error){e.target.checked=!e.target.checked;toast("Could not update step: "+error.message);}}
   });
   $("taskDetailContent").addEventListener("click",async e=>{
     const complete=e.target.closest("[data-detail-complete]"); if(complete)await completeTaskFromDetails(complete.dataset.detailComplete);
-    const reopen=e.target.closest("[data-detail-reopen]"); if(reopen&&await askWIWYConfirm("Reopen task?","This will clear the completed steps and return the task to not started.","Reopen task")){try{await Cloud.reopenTask(reopen.dataset.detailReopen,keyDate());render();openTaskDetails(Cloud.getState().tasks.find(t=>t.id===reopen.dataset.detailReopen));toast("Task reopened.");}catch(error){toast("Could not reopen task: "+error.message);}}
+    const reopen=e.target.closest("[data-detail-reopen]"); if(reopen&&await askWIWYConfirm("Reopen task?","This will clear the completed steps and return the task to not started.","Reopen task")){try{await Cloud.reopenTask(reopen.dataset.detailReopen,detailDateKey);render();await openTaskDetails(Cloud.getState().tasks.find(t=>t.id===reopen.dataset.detailReopen),detailDateKey);toast("Task reopened.");}catch(error){toast("Could not reopen task: "+error.message);}}
   });
   $("closeTaskDetail").onclick=()=>$("taskDetailDialog").close();
   $("pageBack").onclick=goBack;
@@ -324,8 +366,11 @@ function setup() {
       $("profileButton").setAttribute("aria-expanded", "false");
     }
   });
-  document.querySelectorAll("[data-cal-mode]").forEach(b=>b.onclick=()=>{calendarMode=b.dataset.calMode;document.querySelectorAll("[data-cal-mode]").forEach(x=>x.classList.toggle("selected",x===b));toast(calendarMode==="week"?"Week view is coming in the next calendar pass.":"Day view selected.");});
-  $("prevDay").onclick=$("nextDay").onclick=()=>toast("Date navigation is coming in the next calendar pass.");
+  document.querySelectorAll("[data-cal-mode]").forEach(b=>b.onclick=()=>{calendarMode=b.dataset.calMode;calendarReturnToMonth=false;renderCalendar();});
+  $("prevDay").onclick=()=>{if(calendarMode==="day")calendarDate=addDays(calendarDate,-1);else if(calendarMode==="week")calendarDate=addDays(calendarDate,-7);else{const day=calendarDate.getDate();calendarDate.setDate(1);calendarDate.setMonth(calendarDate.getMonth()-1);calendarDate.setDate(Math.min(day,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,0).getDate()));}renderCalendar();};
+  $("nextDay").onclick=()=>{if(calendarMode==="day")calendarDate=addDays(calendarDate,1);else if(calendarMode==="week")calendarDate=addDays(calendarDate,7);else{const day=calendarDate.getDate();calendarDate.setDate(1);calendarDate.setMonth(calendarDate.getMonth()+1);calendarDate.setDate(Math.min(day,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,0).getDate()));}renderCalendar();};
+  $("calendarReturnMonth").onclick=()=>{calendarMode="month";calendarReturnToMonth=false;renderCalendar();};
+  $("calendarToday").onclick=()=>{calendarDate=new Date();calendarDate.setHours(12,0,0,0);calendarMode="day";calendarReturnToMonth=false;renderCalendar();};
   render();
 }
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./service-worker.js").catch(()=>{});

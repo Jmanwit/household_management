@@ -23,10 +23,15 @@ const dateOccurs = (task, date) => {
   }
   return r.date === date;
 };
-const mapTask = (row, ops, assignments, occurrences) => {
+const mapTask = (row, ops, assignments, occurrences, completions) => {
   const r = row.recurrence || { type: "once" };
   const assigneeIds = assignments.filter(a => a.task_id === row.id).map(a => a.member_profile_id);
-  const occurrence = occurrences.find(o => o.task_id === row.id);
+  const taskOccurrences = occurrences.filter(o => o.task_id === row.id);
+  const occurrenceMap = Object.fromEntries(taskOccurrences.map(o => [o.occurrence_date, {
+    id:o.id, status:o.status === "in_progress" ? "progress" : o.status,
+    completedAt:o.completed_at, completedBy:o.completed_by,
+    completedByProfileId:o.completed_by_profile_id
+  }]));
   return {
     id: row.id, name: row.name, assigneeId: assigneeIds[0] || row.assignee_profile_id || null,
     assigneeIds, repeat: r.type || "once", weekdays: r.weekdays || [],
@@ -35,16 +40,15 @@ const mapTask = (row, ops, assignments, occurrences) => {
     createdBy: row.created_by, createdAt: row.created_at,
     operations: ops.filter(o => o.task_id === row.id)
       .sort((a,b) => a.sort_order - b.sort_order)
-      .map(o => ({ id:o.id, name:o.label, required:o.is_required,
-        completed:Boolean(o.completion?.completed_at), completedAt:o.completion?.completed_at })),
-    occurrences: occurrence ? {
-      [occurrence.occurrence_date]: {
-        id: occurrence.id,
-        status: occurrence.status === "in_progress" ? "progress" : occurrence.status,
-        completedAt: occurrence.completed_at, completedBy: occurrence.completed_by,
-        completedByProfileId: occurrence.completed_by_profile_id
-      }
-    } : {}
+      .map(o => {
+        const completedDates = {};
+        for (const occurrence of taskOccurrences) {
+          if (completions.some(x => x.operation_id === o.id && x.occurrence_id === occurrence.id))
+            completedDates[occurrence.occurrence_date] = true;
+        }
+        return {id:o.id,name:o.label,required:o.is_required,completed:!!completedDates[todayKey()],completedDates};
+      }),
+    occurrences: occurrenceMap
   };
 };
 
@@ -146,7 +150,7 @@ export async function refresh() {
       const [opRes, assignRes, occRes] = await Promise.all([
         client.from("task_operations").select("id,task_id,label,sort_order,is_required").in("task_id", taskIds),
         client.from("task_assignments").select("task_id,member_profile_id").in("task_id", taskIds),
-        client.from("task_occurrences").select("id,task_id,occurrence_date,status,completed_at,completed_by,completed_by_profile_id").eq("workspace_id", workspace.id).eq("occurrence_date", todayKey()).in("task_id", taskIds)
+        client.from("task_occurrences").select("id,task_id,occurrence_date,status,completed_at,completed_by,completed_by_profile_id").eq("workspace_id", workspace.id).in("task_id", taskIds)
       ]);
       if (opRes.error) throw opRes.error;
       if (assignRes.error) throw assignRes.error;
@@ -161,10 +165,9 @@ export async function refresh() {
         completions = completionRes.data || [];
       }
     }
-    const opsWithCompletion = ops.map(op => ({...op, completion:completions.find(x => x.operation_id === op.id && occurrences.some(o => o.id === x.occurrence_id)) || null}));
     state = {
       people: (peopleRes.data || []).map(p => ({id:p.id,name:p.display_name,color:p.color,role:"Household member",accountId:null})),
-      tasks: taskRows.map(t => mapTask(t, opsWithCompletion, assignments, occurrences))
+      tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences, completions))
     };
     return getState();
   } finally { refreshBusy = false; }
@@ -245,6 +248,14 @@ export async function deleteTask(id) {
   const { error } = await client.from("tasks").delete().eq("id", id);
   if (error) throw error;
   await recordActivity("Deleted a task", "task", id, {task_name:task?.name || "Task"});
+  await refresh();
+}
+export async function ensureOccurrence(taskId, dateKey) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task || !dateOccurs({recurrence:{type:task.repeat,weekdays:task.weekdays,date:task.date}}, dateKey))
+    throw new Error("This task is not scheduled for that date.");
+  const { error } = await client.rpc("ensure_task_occurrence", {target_task:taskId,target_date:dateKey});
+  if (error) throw error;
   await refresh();
 }
 export async function setOccurrence(taskId, dateKey, status) {
