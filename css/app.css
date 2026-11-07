@@ -114,3 +114,17 @@ input::placeholder,textarea::placeholder{color:#a09584}
 .account-menu-heading span{font-size:12px;color:var(--muted,#777)}
 .account-menu button{display:block;width:100%;text-align:left;padding:11px 12px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer}
 .account-menu button:hover{background:rgba(80,90,70,.10)}
+
+/* WIWY 0.6.0 shared assignment controls */
+#taskAssignee[multiple] { min-height: 112px; padding: 8px; }
+#taskAssignee[multiple] option { padding: 7px 8px; border-radius: 5px; }
+.task-check:disabled { opacity: .65; cursor: default; }
+
+/* WIWY 0.6.0 */
+.assignee-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:8px; padding:10px; border:1px solid var(--line, #d8d3c8); border-radius:10px; }
+.assignee-option { display:flex; align-items:center; gap:8px; margin:0; padding:7px 8px; border-radius:7px; background:rgba(120,154,128,.08); }
+.assignee-option input { width:17px; height:17px; margin:0; }
+.assignee-option input:disabled { opacity:.6; }
+.sync-note { margin:10px 0; padding:10px 12px; border-left:3px solid #a58a55; background:rgba(165,138,85,.10); color:var(--muted, #746f65); font-size:.88rem; border-radius:0 8px 8px 0; }
+button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allowed; }
+.task-check:disabled { opacity:.65; cursor:default; }
