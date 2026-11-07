@@ -5,7 +5,9 @@ const $ = id => document.getElementById(id);
 const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const shortDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [];
-let toastTimer;\nlet authenticatedWorkspace = null;\nlet signedInUser = null;
+let toastTimer;
+let authenticatedWorkspace = null;
+let signedInUser = null;
 
 function toast(message) {
   $("toast").textContent = message; $("toast").classList.add("show");
