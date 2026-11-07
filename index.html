@@ -170,5 +170,15 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="./js/app.js"></script>
+
+  <dialog id="taskDetailDialog" class="modal task-detail-modal">
+    <div class="modal-head"><div><span class="eyebrow">TASK DETAILS</span><h2 id="taskDetailTitle">Task</h2></div><button class="close-button" id="closeTaskDetail" aria-label="Close">×</button></div>
+    <div id="taskDetailContent"></div>
+  </dialog>
+  <dialog id="wiwyConfirmDialog" class="modal confirm-modal">
+    <div class="modal-head"><div><span class="eyebrow">PLEASE CONFIRM</span><h2 id="wiwyConfirmTitle">Confirm action</h2></div></div>
+    <p id="wiwyConfirmMessage"></p>
+    <div class="modal-actions"><button class="secondary-button" id="wiwyConfirmCancel">Cancel</button><button class="primary-button" id="wiwyConfirmAccept">Confirm</button></div>
+  </dialog>
 </body>
 </html>
