@@ -136,3 +136,19 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 .summary-card[data-summary-filter] { cursor:pointer; transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
 .summary-card[data-summary-filter]:hover { transform:translateY(-2px); box-shadow:0 7px 18px rgba(45,39,30,.09); }
 .summary-card[data-summary-filter]:focus-visible { outline:3px solid var(--forest, #3e624b); outline-offset:3px; }
+
+/* WIWY 0.6.3 navigation and shared step checklist */
+.page-back { border:1px solid var(--line); background:var(--surface); color:var(--text); border-radius:10px; min-width:42px; min-height:42px; font-size:25px; line-height:1; display:grid; place-items:center; margin-right:12px; }
+.page-back[hidden] { display:none; }
+.topbar > .page-back { flex:0 0 42px; }
+.task-card { border-bottom:1px solid var(--line); padding:5px 0 13px; }
+.task-card:last-child { border-bottom:0; }
+.task-card .task-row { border:0; padding:10px 0 8px; }
+.task-steps { display:grid; gap:7px; margin:0 0 0 38px; padding:2px 0 4px 14px; border-left:2px solid var(--line); }
+.task-step { display:flex; align-items:center; gap:10px; padding:7px 9px; border-radius:8px; background:rgba(120,154,128,.08); color:var(--text); font-size:12px; }
+.task-step input { width:18px; height:18px; flex:0 0 18px; margin:0; accent-color:#52785b; }
+.task-step.step-done span { text-decoration:line-through; color:var(--muted); }
+.task-step input:disabled { opacity:.65; }
+.steps-hint { margin:4px 0 0 52px; font-size:11px; color:var(--green); }
+.reopen-task { border:1px solid #a66b5b; color:#8e493c; background:transparent; border-radius:8px; padding:6px 9px; font-size:11px; font-weight:750; }
+@media(max-width:650px) { .page-back { margin-right:0; min-width:36px; min-height:36px; font-size:23px; } .task-steps { margin-left:30px; } }
