@@ -60,10 +60,10 @@
           <button class="primary-button" id="quickAddTask">＋ <span>Add task</span></button>
         </div>
         <div class="summary-grid">
-          <article class="summary-card"><div class="summary-label">ON THE SCHEDULE</div><div class="summary-value" id="scheduledCount">0</div><div class="summary-foot">tasks and routines today</div></article>
-          <article class="summary-card"><div class="summary-label">COMPLETED</div><div class="summary-value" id="completedCount">0</div><div class="summary-foot">finished together</div></article>
-          <article class="summary-card"><div class="summary-label">IN PROGRESS</div><div class="summary-value" id="progressCount">0</div><div class="summary-foot">currently underway</div></article>
-          <article class="summary-card"><div class="summary-label">NEEDS A START</div><div class="summary-value" id="notStartedCount">0</div><div class="summary-foot">scheduled and not started</div></article>
+          <article class="summary-card" data-summary-filter="scheduled"><div class="summary-label">ON THE SCHEDULE</div><div class="summary-value" id="scheduledCount">0</div><div class="summary-foot">tasks and routines today</div></article>
+          <article class="summary-card" data-summary-filter="completed"><div class="summary-label">COMPLETED</div><div class="summary-value" id="completedCount">0</div><div class="summary-foot">finished together</div></article>
+          <article class="summary-card" data-summary-filter="progress"><div class="summary-label">IN PROGRESS</div><div class="summary-value" id="progressCount">0</div><div class="summary-foot">currently underway</div></article>
+          <article class="summary-card" data-summary-filter="late"><div class="summary-label">NEEDS A START</div><div class="summary-value" id="notStartedCount">0</div><div class="summary-foot">scheduled and not started</div></article>
         </div>
         <div class="content-grid">
           <section class="panel agenda-panel">
