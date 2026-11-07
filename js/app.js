@@ -12,7 +12,7 @@ let signedInUser = null;
 
 function toast(message) {
   $("toast").textContent = message; $("toast").classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(()=>$("toast").classList.remove("show"), 2600);
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>$("toast").classList.remove("show"), 4200);
 }
 function keyDate(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function dateLabel(d = new Date()) { return d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}); }
@@ -69,7 +69,17 @@ function renderToday() {
   $("dinnerPreview").innerHTML=dinner?`<div class="empty-icon">♨</div><div><strong>${esc(dinner.name)}</strong><div class="agenda-meta">${esc(dinner.notes||"Dinner plan")}</div></div>`:`<div class="empty-icon">♨</div><p>No dinner planned yet.</p>`;
 }
 function renderTasks() {
-  const tasks=Cloud.getState().tasks.filter(t=>taskFilter==="all"||(taskFilter==="active"&&!t.archived)||(taskFilter==="recurring"&&t.repeat!=="once"));
+  const allTasks=Cloud.getState().tasks;
+  const tasks=allTasks.filter(t=>{
+    const status=statusFor(t);
+    if(taskFilter==="scheduled") return !t.archived;
+    if(taskFilter==="completed") return status==="done";
+    if(taskFilter==="progress") return status==="progress";
+    if(taskFilter==="late") return status==="late";
+    if(taskFilter==="active") return !t.archived;
+    if(taskFilter==="recurring") return t.repeat!=="once";
+    return !t.archived;
+  });
   $("taskList").innerHTML=tasks.length?tasks.map(t=>{const done=t.occurrences?.[keyDate()]?.status==="completed";const names=(t.assigneeIds||[]).map(personName).join(", ")||"Unassigned";const canEdit=Cloud.canManageTask(t);const canComplete=Cloud.canCompleteTask(t);return `<div class="task-row"><button class="task-check ${done?"checked":""}" data-complete="${t.id}" ${!canComplete||done?"disabled":""} aria-label="Complete task">${done?"✓":""}</button><div class="task-main"><div class="task-title">${esc(t.name)}</div><div class="task-detail">${esc(names)} · ${repeatText(t)} · ${t.operations?.length||0} steps${done?" · Completed"+(t.occurrences?.[keyDate()]?.completedByProfileId?" by "+esc(personName(t.occurrences[keyDate()].completedByProfileId)):""):""}</div></div><div class="task-time">${timeText(t.start)}</div>${canEdit?`<button class="task-edit" data-edit-task="${t.id}" aria-label="Edit task">⋯</button>`:""}</div>`}).join(""):empty("No tasks here yet","Add a task to begin building your household routine.");
 }
 function repeatText(t) { return t.repeat==="daily"?"Daily":t.repeat==="weekdays"?(t.weekdays||[]).map(x=>shortDays[x]).join(", "):"One time"; }
@@ -145,7 +155,7 @@ async function saveTaskFromForm() {
   const task={id:id||undefined,name:$("taskName").value.trim(),assigneeIds:[...document.querySelectorAll("[data-assignee-option]:checked")].map(o=>o.value),repeat,weekdays:repeat==="weekdays"?[...selectedDays]:[],date:repeat==="once"?keyDate():null,start:$("taskStart").value||null,end:$("taskEnd").value||null,operations,notes:$("taskNotes").value.trim()};
   if(!task.name)return false;
   const errorBox=$("taskFormError");errorBox.hidden=true;errorBox.textContent="";
-  try { await Cloud.saveTask(task); $("taskDialog").close(); toast("Task saved and shared."); render(); return true; }
+  try { await Cloud.saveTask(task); $("taskDialog").close(); render(); toast("✓ Task created and saved to your household."); return true; }
   catch(error) { errorBox.textContent="Could not save task: "+error.message; errorBox.hidden=false; return false; }
 }
 function setup() {
@@ -161,8 +171,9 @@ function setup() {
   $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&confirm("Delete this task? Its task definition will be removed.")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
   $("taskList").addEventListener("click",async e=>{const id=e.target.dataset.editTask;if(id)openTask(Cloud.getState().tasks.find(t=>t.id===id));const complete=e.target.dataset.complete;if(complete){try{await Cloud.setOccurrence(complete,keyDate(),"completed");render();toast("Task completed for everyone.");}catch(error){toast("Could not complete task: "+error.message);}}});
   document.querySelectorAll("[data-task-filter]").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.taskFilter;document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x===b));renderTasks();});
+  document.querySelectorAll("[data-summary-filter]").forEach(card=>{card.setAttribute("role","button");card.setAttribute("tabindex","0");card.setAttribute("aria-label","Show "+card.dataset.summaryFilter+" tasks");const activate=()=>{taskFilter=card.dataset.summaryFilter;setView("tasks");document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x.dataset.taskFilter===taskFilter));renderTasks();};card.addEventListener("click",activate);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate();}});});
   $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
-  $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(name){const errorBox=$("personFormError");errorBox.hidden=true;errorBox.textContent="";try{await Cloud.addPerson({name,color:$("personColor").value});$("personDialog").close();populatePeopleSelects();render();toast("Member profile added.");}catch(error){errorBox.textContent="Could not add person: "+error.message;errorBox.hidden=false;}}});
+  $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(name){const errorBox=$("personFormError");errorBox.hidden=true;errorBox.textContent="";try{await Cloud.addPerson({name,color:$("personColor").value});$("personDialog").close();populatePeopleSelects();render();toast("✓ Household member added.");}catch(error){errorBox.textContent="Could not add person: "+error.message;errorBox.hidden=false;}}});
   $("addMealButton").onclick=()=>{$("mealEditor").reset();$("mealDialog").showModal();};
   $("mealEditor").addEventListener("submit",e=>{e.preventDefault();Store.addMeal({day:$("mealDay").value,name:$("mealName").value.trim(),notes:$("mealNotes").value.trim()});$("mealDialog").close();render();toast("Meal added.");});
   $("mealList").addEventListener("click",e=>{const id=e.target.dataset.deleteMeal;if(id){Store.update(s=>s.meals=s.meals.filter(m=>m.id!==id),"Removed a meal","");render();}});
