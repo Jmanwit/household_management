@@ -250,3 +250,5 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
  .week-day-head strong{font-size:9px}
  .calendar-header h3{font-size:17px}
 }
+
+.away-status{white-space:pre-line;padding:10px 12px;border-radius:9px;background:var(--surface2);color:var(--muted);font-size:.88rem;line-height:1.5}
