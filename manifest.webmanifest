@@ -1,0 +1,18 @@
+{
+  "name": "Wherever I'm With You",
+  "short_name": "WIWY",
+  "description": "A shared home and life organizer.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111614",
+  "theme_color": "#151a18",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
