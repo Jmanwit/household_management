@@ -1,5 +1,5 @@
 import * as Store from "./store.js";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js";
+import { requireAuth } from "./auth.js";
 
 const $ = id => document.getElementById(id);
 const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -160,7 +160,6 @@ function setup() {
   $("saveWorkspace").onclick=()=>{Store.saveWorkspaceName($("settingsWorkspace").value.trim()||"Our Home");render();toast("Workspace name saved.");};
   $("exportData").onclick=()=>{const blob=new Blob([Store.exportState()],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wiwy-backup-"+keyDate()+".json";a.click();URL.revokeObjectURL(a.href);};
   $("importData").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{Store.importState(JSON.parse(await f.text()));render();toast("Backup imported.");}catch(err){alert(err.message);}e.target.value="";};
-  $("saveConnection").onclick=async()=>{const result=await Store.connectSupabase($("supabaseUrl").value.trim(),$("supabaseKey").value.trim());$("connectionStatus").textContent=result.message;toast(result.ok?"Supabase client ready.":"Connection not configured.");};
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
   $("awayEditor").addEventListener("submit",e=>{e.preventDefault();const scope=$("awayScope").value;Store.setAway({scope,personId:scope==="person"?$("awayPerson").value:null,duration:$("awayDuration").value,enabledAt:new Date().toISOString()});$("awayDialog").close();render();toast("Away mode enabled.");});
   $("turnOffAway").onclick=()=>{Store.setAway(null);$("awayDialog").close();render();toast("Away mode turned off.");};
@@ -172,11 +171,21 @@ function setup() {
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSidebar(); });
   $("workspaceButton").onclick=()=>toast("Workspace switching will be added with account and invitation support.");
   $("notificationButton").onclick=()=>toast("Notifications are planned for the next build stage.");
-  $("profileButton").onclick=()=>toast("Account sign-in will be added with shared workspace sync.");
+  $("profileButton").onclick=async()=>{if(confirm("Sign out of WIWY on this device?")){try{await window.WIWY_AUTH?.client?.auth.signOut();location.reload();}catch(error){toast("Could not sign out: "+error.message);}}};
   document.querySelectorAll("[data-cal-mode]").forEach(b=>b.onclick=()=>{calendarMode=b.dataset.calMode;document.querySelectorAll("[data-cal-mode]").forEach(x=>x.classList.toggle("selected",x===b));toast(calendarMode==="week"?"Week view is coming in the next calendar pass.":"Day view selected.");});
   $("prevDay").onclick=$("nextDay").onclick=()=>toast("Date navigation is coming in the next calendar pass.");
-  if(SUPABASE_URL&&SUPABASE_PUBLISHABLE_KEY){$("supabaseUrl").value=SUPABASE_URL;$("supabaseKey").value=SUPABASE_PUBLISHABLE_KEY;}
   render();
 }
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
-setup();
+(async () => {
+  try {
+    const auth = await requireAuth();
+    window.WIWY_AUTH = auth;
+    setup();
+    toast("Signed in. Workspace is ready.");
+  } catch (error) {
+    console.error("WIWY authentication startup:", error);
+    const msg = document.getElementById("authMessage");
+    if (msg) { msg.textContent = error.message || "Could not initialize WIWY."; msg.classList.add("error"); }
+  }
+})();

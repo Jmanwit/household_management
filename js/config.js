@@ -1,5 +1,6 @@
-// WIWY public client configuration.
-// Safe to store the Supabase Project URL and Publishable key here.
-// NEVER put a Supabase service_role / secret key in this file.
-export const SUPABASE_URL = "";
-export const SUPABASE_PUBLISHABLE_KEY = "";
+// WIWY deployment configuration.
+// Set these two values in your GitHub repository before deploying.
+// The publishable key is intended for client-side use.
+// NEVER put a service_role key, secret key, or database password here.
+export const SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
+export const SUPABASE_PUBLISHABLE_KEY = "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
