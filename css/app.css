@@ -131,3 +131,8 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 
 .form-error { margin: 10px 0 14px; padding: 11px 13px; border: 1px solid #b66b58; border-radius: 9px; background: #f7e7df; color: #743b2e; font-size: .9rem; line-height: 1.45; }
 .form-error[hidden] { display:none; }
+
+/* Dashboard summary cards are interactive task shortcuts */
+.summary-card[data-summary-filter] { cursor:pointer; transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.summary-card[data-summary-filter]:hover { transform:translateY(-2px); box-shadow:0 7px 18px rgba(45,39,30,.09); }
+.summary-card[data-summary-filter]:focus-visible { outline:3px solid var(--forest, #3e624b); outline-offset:3px; }
