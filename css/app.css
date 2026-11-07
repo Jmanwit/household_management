@@ -152,3 +152,16 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 .steps-hint { margin:4px 0 0 52px; font-size:11px; color:var(--green); }
 .reopen-task { border:1px solid #a66b5b; color:#8e493c; background:transparent; border-radius:8px; padding:6px 9px; font-size:11px; font-weight:750; }
 @media(max-width:650px) { .page-back { margin-right:0; min-width:36px; min-height:36px; font-size:23px; } .task-steps { margin-left:30px; } }
+
+/* WIWY 0.6.4 — agenda detail and branded confirmation dialogs */
+.agenda-task-button { width:100%; border:0; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+.agenda-task-button:hover { background:rgba(62,98,75,.07); border-radius:10px; }
+.agenda-task-button:focus-visible { outline:3px solid var(--forest,#3e624b); outline-offset:2px; }
+.detail-section { padding:12px 0; border-bottom:1px solid var(--line,#d8d0bf); }
+.detail-section:last-child { border-bottom:0; }
+.detail-section h3 { margin:0 0 6px; font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted,#827969); }
+.detail-section p { margin:0; line-height:1.55; }
+.detail-steps { list-style:none; padding:0; margin:0; display:grid; gap:8px; }
+.detail-notes { white-space:pre-wrap; }
+.confirm-modal { max-width: min(92vw, 440px); }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:22px; }
