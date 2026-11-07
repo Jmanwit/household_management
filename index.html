@@ -109,7 +109,6 @@
       <section class="view" id="view-settings">
         <div class="settings-grid">
           <div class="panel settings-card"><span class="eyebrow">WORKSPACE</span><h3>Workspace settings</h3><label>Workspace name<input id="settingsWorkspace" value="Our Home"></label><button class="primary-button" id="saveWorkspace">Save name</button></div>
-          <div class="panel settings-card"><span class="eyebrow">CONNECTION</span><h3>Supabase</h3><p class="muted">Connect this app to your own Supabase project to sync across family devices.</p><label>Project URL<input id="supabaseUrl" placeholder="https://your-project.supabase.co"></label><label>Publishable key<input id="supabaseKey" placeholder="sb_publishable_…"></label><button class="primary-button" id="saveConnection">Save connection</button><p class="tiny muted" id="connectionStatus">Not connected. Using this device's local data.</p></div>
           <div class="panel settings-card"><span class="eyebrow">DATA</span><h3>Backup & restore</h3><p class="muted">Export a copy of your workspace data or restore from a previous export.</p><div class="button-row"><button class="secondary-button" id="exportData">Export JSON</button><label class="file-button">Import JSON<input type="file" id="importData" accept="application/json"></label></div></div>
           <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Early access foundation 0.1.0</div></div>
         </div>
@@ -146,6 +145,21 @@
   <dialog id="awayDialog" class="modal small-modal">
     <form method="dialog" id="awayEditor"><div class="modal-head"><div><span class="eyebrow">FLEXIBLE BY DESIGN</span><h2>Away mode</h2></div><button class="close-button" value="cancel">×</button></div><p class="muted">Pause routine reminders without completing or deleting tasks. Your schedule and history stay intact.</p><label>Apply to<select id="awayScope"><option value="workspace">Everyone in this workspace</option><option value="person">One person</option></select></label><label id="awayPersonWrap" hidden>Person<select id="awayPerson"></select></label><label>Resume<select id="awayDuration"><option value="tomorrow">Tomorrow at 5:00 AM</option><option value="indefinite">Manually turn off</option></select></label><div class="modal-actions"><button type="button" class="secondary-button" id="turnOffAway">Turn off</button><span></span><button class="primary-button" value="save">Enable away mode</button></div></form>
   </dialog>
+
+
+  <section id="authGate" class="auth-gate" hidden>
+    <div class="auth-card">
+      <div class="brand auth-brand"><div class="brand-mark">W</div><div><div class="brand-name">WIWY</div><div class="brand-subtitle">Wherever I'm With You</div></div></div>
+      <span class="eyebrow">YOUR PRIVATE WORKSPACE</span>
+      <h1>Welcome home.</h1>
+      <p class="auth-intro">Sign in or create your administrator account to set up your WIWY workspace.</p>
+      <label>Your name<input id="authName" type="text" placeholder="Name" autocomplete="name"></label>
+      <label>Email address<input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email"></label>
+      <label>Password<input id="authPassword" type="password" placeholder="At least 8 characters" autocomplete="current-password"></label>
+      <div class="auth-actions"><button class="primary-button" id="authSignIn" type="button">Sign in</button><button class="secondary-button" id="authSignUp" type="button">Create account</button></div>
+      <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
+    </div>
+  </section>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="./js/app.js"></script>
