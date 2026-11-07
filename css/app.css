@@ -251,4 +251,4 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
  .calendar-header h3{font-size:17px}
 }
 
-.away-status{white-space:pre-line;padding:10px 12px;border-radius:9px;background:var(--surface2);color:var(--muted);font-size:.88rem;line-height:1.5}
+.away-status{padding:10px 12px;border-radius:9px;background:var(--surface2);color:var(--muted);font-size:.88rem;line-height:1.5}.away-status-heading{font-weight:700;color:var(--ink);margin-bottom:8px}.away-period-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}.away-period-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.away-period-copy strong{color:var(--ink);font-size:.92rem}.away-period-copy span{font-size:.82rem}.away-cancel-button{flex:0 0 auto;padding:8px 11px;font-size:.82rem}
