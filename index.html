@@ -126,12 +126,12 @@
 
   <dialog id="taskDialog" class="modal">
     <form method="dialog" id="taskEditor">
-      <div class="modal-head"><div><span class="eyebrow">TASK BUILDER</span><h2 id="taskDialogTitle">Create a task</h2></div><button class="close-button" value="cancel" aria-label="Close">×</button></div>
+      <div class="modal-head"><div><span class="eyebrow">TASK BUILDER</span><h2 id="taskDialogTitle">Create a task</h2></div><button type="button" class="close-button" id="closeTaskEditor" aria-label="Close">×</button></div>
       <input type="hidden" id="taskId">
       <div id="taskFormError" class="form-error" role="alert" hidden></div>
       <label>Task name<input id="taskName" required maxlength="100" placeholder="e.g. Kitchen reset"></label>
       <div class="form-row"><label>Assigned members<div id="taskAssigneeOptions" class="assignee-options" aria-describedby="assigneeHelp"></div><span id="assigneeHelp" class="label-hint">Choose everyone who shares responsibility for this task. Any one assigned person can complete it.</span></label><label>Repeat<select id="taskRepeat"><option value="once">One time</option><option value="daily">Every day</option><option value="weekdays">Selected weekdays</option></select></label></div>
-      <div id="weekdayPicker" class="weekday-picker" hidden><button type="button" data-day="1">M</button><button type="button" data-day="2">T</button><button type="button" data-day="3">W</button><button type="button" data-day="4">T</button><button type="button" data-day="5">F</button><button type="button" data-day="6">S</button><button type="button" data-day="0">S</button></div>
+      <div id="weekdayPicker" class="weekday-picker" hidden><button type="button" data-day="0" aria-label="Sunday">S</button><button type="button" data-day="1" aria-label="Monday">M</button><button type="button" data-day="2" aria-label="Tuesday">T</button><button type="button" data-day="3" aria-label="Wednesday">W</button><button type="button" data-day="4" aria-label="Thursday">T</button><button type="button" data-day="5" aria-label="Friday">F</button><button type="button" data-day="6" aria-label="Saturday">S</button></div>
       <div class="form-row"><label>Start time<input type="time" id="taskStart"></label><label>End time<input type="time" id="taskEnd"></label></div>
       <label>Task steps <span class="label-hint">Optional · add the steps that define done</span></label>
       <div id="operationEditor" class="operation-editor"></div>
