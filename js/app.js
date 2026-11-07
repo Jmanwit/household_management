@@ -79,20 +79,45 @@ function askWIWYConfirm(title, message, acceptLabel="Confirm") {
 }
 function openTaskDetails(task) {
   if(!task)return;
-  const occurrence=task.occurrences?.[keyDate()];
+  const date=keyDate();
+  const occurrence=task.occurrences?.[date];
+  const done=occurrence?.status==="completed";
   const names=(task.assigneeIds||[]).map(personName).join(", ")||"Unassigned";
-  const steps=(task.operations||[]).length
-    ? `<section class="detail-section"><h3>Steps</h3><ul class="detail-steps">${task.operations.map(o=>`<li>${o.completed?"☑":"☐"} ${esc(o.name)}</li>`).join("")}</ul></section>`
+  const canComplete=Cloud.canCompleteTask(task);
+  const canEdit=Cloud.canManageTask(task);
+  const operations=task.operations||[];
+  const steps=operations.length
+    ? `<section class="detail-section"><h3>Steps</h3><ul class="detail-steps">${operations.map(o=>`<li><label class="detail-step ${o.completed?"step-done":""}"><input type="checkbox" data-detail-step-task="${task.id}" data-detail-step-id="${o.id}" ${o.completed?"checked":""} ${!canComplete||done?"disabled":""}><span>${esc(o.name)}</span></label></li>`).join("")}</ul></section>`
     : "";
+  const status=done?"Completed":occurrence?.status==="progress"?"In progress":statusFor(task)==="late"?"Needs a start":"Scheduled";
   $("taskDetailTitle").textContent=task.name;
   $("taskDetailContent").innerHTML=`
-    <section class="detail-section"><h3>Schedule</h3><p>${esc(task.date||keyDate())} · ${esc(timeText(task.start))}${task.end?" – "+esc(timeText(task.end)):""}</p></section>
+    <section class="detail-section"><h3>Schedule</h3><p>${esc(dateLabel(new Date(date+"T12:00:00")))} · ${esc(timeText(task.start))}${task.end?" – "+esc(timeText(task.end)):""}</p></section>
     <section class="detail-section"><h3>Assigned to</h3><p>${esc(names)}</p></section>
     ${task.notes?`<section class="detail-section"><h3>Notes</h3><p class="detail-notes">${esc(task.notes)}</p></section>`:""}
     ${steps}
-    <section class="detail-section"><h3>Status</h3><p>${occurrence?.status==="completed"?"Completed":occurrence?.status==="progress"?"In progress":statusFor(task)==="late"?"Needs a start":"Scheduled"}</p></section>`;
+    <section class="detail-section"><h3>Status</h3><p id="taskDetailStatus">${status}${done&&occurrence?.completedByProfileId?" · Completed by "+esc(personName(occurrence.completedByProfileId)):""}</p></section>
+    <div class="detail-actions">
+      ${done&&canEdit?`<button class="secondary-button" data-detail-reopen="${task.id}">Reopen task</button>`:!done&&canComplete?`<button class="primary-button" data-detail-complete="${task.id}">Mark task complete</button>`:""}
+    </div>`;
+  $("taskDetailDialog").dataset.taskId=task.id;
   $("taskDetailDialog").showModal();
 }
+async function completeTaskFromDetails(taskId) {
+  const task=Cloud.getState().tasks.find(t=>t.id===taskId); if(!task)return;
+  try {
+    if(task.operations?.length>=2){
+      if(!await askWIWYConfirm("Complete this task?","Are all steps for this task complete? Confirming will mark every step complete.","Complete task"))return;
+      await Cloud.completeAllStepsAndTask(taskId,keyDate());
+    } else if(task.operations?.length===1) {
+      await Cloud.completeAllStepsAndTask(taskId,keyDate());
+    } else {
+      await Cloud.setOccurrence(taskId,keyDate(),"completed");
+    }
+    render(); openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskId)); toast("✓ Task completed for everyone.");
+  } catch(error){toast("Could not complete task: "+error.message);}
+}
+
 function renderToday() {
   const state={...Store.getState(), ...Cloud.getState()}, tasks=todayTasks();
   const done=tasks.filter(t=>statusFor(t)==="done").length, progress=tasks.filter(t=>statusFor(t)==="progress").length, late=tasks.filter(t=>statusFor(t)==="late").length;
@@ -154,7 +179,7 @@ function renderCalendar() {
     const start=parseTime(t.start)??9*60, end=parseTime(t.end)??start+45;
     const top=(start-6*60)/60*62, height=Math.max(34,(end-start)/60*62);
     const slot=$(`calendarGrid`).querySelector(`[data-hour="${Math.max(6,Math.min(22,Math.floor(start/60)))}"]`);
-    if(slot){const ev=document.createElement("div");ev.className="calendar-event";ev.style.cssText=`top:${(start%60)/60*62}px;height:${Math.min(height,500)}px;--person-color:${personColor((t.assigneeIds||[])[0])}`;ev.innerHTML=`<strong>${esc(t.name)}</strong><small>${timeText(t.start)} · ${esc((t.assigneeIds||[]).map(personName).join(", ")||"Unassigned")}</small>`;slot.appendChild(ev);}
+    if(slot){const ev=document.createElement("button");ev.type="button";ev.className="calendar-event calendar-event-button";ev.dataset.calendarTask=t.id;ev.style.cssText=`top:${(start%60)/60*62}px;height:${Math.min(height,500)}px;--person-color:${personColor((t.assigneeIds||[])[0])}`;ev.innerHTML=`<strong>${esc(t.name)}</strong><small>${timeText(t.start)} · ${esc((t.assigneeIds||[]).map(personName).join(", ")||"Unassigned")}</small>`;slot.appendChild(ev);}
   });
 }
 function render() {
@@ -204,6 +229,15 @@ function setup() {
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
   document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.go)));
   $("todayAgenda").addEventListener("click",e=>{const button=e.target.closest("[data-agenda-task]");if(button)openTaskDetails(Cloud.getState().tasks.find(t=>t.id===button.dataset.agendaTask));});
+  $("calendarGrid").addEventListener("click",e=>{const button=e.target.closest("[data-calendar-task]");if(button)openTaskDetails(Cloud.getState().tasks.find(t=>t.id===button.dataset.calendarTask));});
+  $("taskDetailContent").addEventListener("change",async e=>{
+    const taskId=e.target.dataset.detailStepTask, operationId=e.target.dataset.detailStepId;
+    if(taskId&&operationId){try{await Cloud.setOperationCompletion(taskId,keyDate(),operationId,e.target.checked);render();openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskId));const t=Cloud.getState().tasks.find(x=>x.id===taskId);if(t?.occurrences?.[keyDate()]?.status==="completed")toast("✓ All required steps completed. Task finished.");}catch(error){e.target.checked=!e.target.checked;toast("Could not update step: "+error.message);}}
+  });
+  $("taskDetailContent").addEventListener("click",async e=>{
+    const complete=e.target.closest("[data-detail-complete]"); if(complete)await completeTaskFromDetails(complete.dataset.detailComplete);
+    const reopen=e.target.closest("[data-detail-reopen]"); if(reopen&&await askWIWYConfirm("Reopen task?","This will clear the completed steps and return the task to not started.","Reopen task")){try{await Cloud.reopenTask(reopen.dataset.detailReopen,keyDate());render();openTaskDetails(Cloud.getState().tasks.find(t=>t.id===reopen.dataset.detailReopen));toast("Task reopened.");}catch(error){toast("Could not reopen task: "+error.message);}}
+  });
   $("closeTaskDetail").onclick=()=>$("taskDetailDialog").close();
   $("pageBack").onclick=goBack;
   $("quickAddTask").onclick=$("newTaskButton").onclick=()=>openTask();
