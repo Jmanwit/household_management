@@ -285,3 +285,7 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 .completion-push-option { padding-top:10px; border-top:1px solid var(--line, #ded8cc); font-weight:600; }
 .small-note { font-size:.78rem; }
 @media(max-width:520px) { .reminder-presets { grid-template-columns:1fr; } .notification-row { align-items:flex-start; } .custom-reminder-controls { flex-wrap:wrap; } }
+
+/* 0.8.1 hotfix: restrained outline notification bell */
+.notification-bell{width:21px;height:21px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.notification-button{display:grid;place-items:center}
