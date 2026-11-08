@@ -5,7 +5,7 @@ import { requireAuth, renameActiveWorkspace, getSignedInUser } from "./auth.js";
 const $ = id => document.getElementById(id);
 const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const shortDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [], viewHistory = [];
+let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [], customReminderOffsets = [], viewHistory = [];
 let calendarDate = new Date(); calendarDate.setHours(12,0,0,0);
 let calendarReturnToMonth = false;
 let detailDateKey = keyDate();
@@ -401,7 +401,7 @@ function setup() {
   $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&await askWIWYConfirm("Delete task?","This removes the task definition. This action cannot be undone.","Delete task")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
   $("taskList").addEventListener("click",async e=>{
     const editButton=e.target.closest("[data-edit-task]");
-    if(editButton){const edit=editButton.dataset.editTask;const task=Cloud.getState().tasks.find(t=>t.id===edit);if(task)openTask(task);return;}
+    if(editButton){const edit=editButton.dataset.editTask;const task=Cloud.getState().tasks.find(t=>t.id===edit);if(task){try{openTask(task);}catch(error){console.error("Could not open task editor:",error);toast("Could not open the task editor: "+error.message);}}return;}
     const completeButton=e.target.closest("[data-complete]");
     const complete=completeButton?.dataset.complete;
     if(complete){const task=Cloud.getState().tasks.find(t=>t.id===complete);try{
