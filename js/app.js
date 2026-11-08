@@ -252,42 +252,69 @@ function pushBase64ToBytes(value) {
   const raw = atob(base64);
   return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
 }
+async function waitForPushServiceWorker() {
+  if (!('serviceWorker' in navigator)) throw new Error('This browser does not support service workers.');
+  const registration = await navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' });
+  // Force a check for the repaired worker, then wait for activation with a useful timeout.
+  try { await registration.update(); } catch (error) { console.warn('WIWY service-worker update check:', error); }
+  if (registration.active) return registration;
+  await new Promise((resolve, reject) => {
+    const worker = registration.installing || registration.waiting;
+    if (!worker) { reject(new Error('The WIWY service worker did not start installing. Refresh the page and try again.')); return; }
+    const timeout = setTimeout(() => reject(new Error('The WIWY service worker did not activate within 15 seconds. Refresh the page once, then try again.')), 15000);
+    const check = () => {
+      if (worker.state === 'activated' || registration.active) { clearTimeout(timeout); resolve(); }
+      else if (worker.state === 'redundant') { clearTimeout(timeout); reject(new Error('The WIWY service worker installation failed. Check that the latest app files were uploaded, then refresh.')); }
+    };
+    worker.addEventListener('statechange', check);
+    check();
+  });
+  return registration;
+}
 async function enablePushNotifications() {
-  const button = $("enablePushButton");
-  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    toast("Push notifications are not supported by this browser. In-app notifications will still work.");
+  const button = $('enablePushButton');
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    toast('Push notifications are not supported by this browser. In-app notifications will still work.');
     return;
   }
-  button.disabled = true; button.textContent = "Enabling…";
+  button.disabled = true;
+  button.textContent = 'Enabling…';
+  let enabled = false;
   try {
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      toast(permission === "denied" ? "Notifications are blocked in browser settings. In-app notifications remain available." : "Notifications were not enabled. You can try again here later.");
+    const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    if (permission !== 'granted') {
+      toast(permission === 'denied' ? 'Notifications are blocked in browser settings. In-app notifications remain available.' : 'Notifications were not enabled. You can try again here later.');
       return;
     }
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await waitForPushServiceWorker();
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true, applicationServerKey: pushBase64ToBytes(WIWY_VAPID_PUBLIC_KEY)
     });
     const authClient = window.WIWY_AUTH?.client;
-    const currentUser = await authClient?.auth.getUser();
-    if (!authClient || currentUser?.error || !currentUser?.data?.user?.id) throw new Error("Your WIWY account session could not be verified. Please sign in again.");
+    if (!authClient) throw new Error('WIWY could not access your signed-in account. Sign out and back in, then try again.');
+    const { data: userData, error: userError } = await authClient.auth.getUser();
+    if (userError || !userData?.user?.id) throw new Error('Your WIWY account session could not be verified. Please sign in again.');
     const payload = subscription.toJSON();
-    const { error } = await authClient.from("push_subscriptions").upsert({
-      user_id: currentUser.data.user.id, endpoint: subscription.endpoint, subscription: payload, user_agent: navigator.userAgent, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", updated_at: new Date().toISOString()
-    }, { onConflict: "endpoint" });
-    if (error) throw error;
-    button.textContent = "Push notifications enabled";
-    toast("This device is registered for WIWY push notifications.");
+    const { error } = await authClient.from('push_subscriptions').upsert({
+      user_id: userData.user.id, endpoint: subscription.endpoint, subscription: payload,
+      user_agent: navigator.userAgent,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'endpoint' });
+    if (error) throw new Error('The device subscription was created, but Supabase could not save it: ' + error.message);
+    enabled = true;
+    button.textContent = 'Push notifications enabled';
+    toast('This device is registered for WIWY push notifications.');
   } catch (error) {
-    console.error("WIWY push registration:", error);
-    toast("Could not enable push notifications: " + (error.message || "Unknown error"));
+    console.error('WIWY push registration:', error);
+    toast('Could not enable push notifications: ' + (error?.message || 'Unknown error'));
   } finally {
     button.disabled = false;
-    if (Notification.permission === "granted") button.textContent = "Enable push on this device";
+    if (!enabled) button.textContent = Notification.permission === 'granted' ? 'Try enabling push again' : 'Enable push on this device';
   }
 }
+
 function esc(s="") { return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function populatePeopleSelects() {
   const people=Cloud.getState().people;
