@@ -43,7 +43,7 @@
         <div><div class="eyebrow" id="dateLabel">YOUR HOUSEHOLD</div><h1 id="pageTitle">Today</h1></div>
         <div class="top-actions">
           <button class="icon-button" id="awayButton" title="Away mode synchronization is coming later" disabled>☼ <span class="desktop-only">Away mode</span></button>
-          <button class="icon-button notification-button" id="notificationButton" title="Notifications">♧<i></i></button>
+          <button class="icon-button notification-button" id="notificationButton" title="Notifications" aria-label="Notifications">🔔<i></i></button>
           <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false">♙</button>
           <div id="accountMenu" class="account-menu" hidden>
             <div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div>
@@ -137,8 +137,32 @@
       <div id="operationEditor" class="operation-editor"></div>
       <div class="operation-add"><input id="newOperation" placeholder="Add a step…"><button type="button" class="secondary-button" id="addOperation">＋ Add step</button></div>
       <label>Notes<textarea id="taskNotes" rows="2" placeholder="Helpful details, supplies, or instructions…"></textarea></label>
+      <section class="task-reminder-settings">
+        <div class="reminder-heading"><strong>Reminders</strong><span class="label-hint">Sent to assigned members</span></div>
+        <p class="muted">A reminder is sent at the scheduled start time. Add any advance reminders you want below.</p>
+        <div class="reminder-start-default">✓ At scheduled start time <span>Default</span></div>
+        <div class="reminder-presets">
+          <label><input type="checkbox" data-reminder-offset="5"> 5 minutes before</label>
+          <label><input type="checkbox" data-reminder-offset="15"> 15 minutes before</label>
+          <label><input type="checkbox" data-reminder-offset="30"> 30 minutes before</label>
+          <label><input type="checkbox" data-reminder-offset="60"> 1 hour before</label>
+        </div>
+        <div class="custom-reminder-row">
+          <label>Custom advance reminder
+            <div class="custom-reminder-controls"><input id="customReminderAmount" type="number" min="1" max="30" value="1"><select id="customReminderUnit"><option value="minutes">Minutes</option><option value="hours">Hours</option><option value="days">Days</option></select><button type="button" class="secondary-button" id="addCustomReminder">Add</button></div>
+          </label>
+        </div>
+        <div id="selectedCustomReminders" class="selected-reminders" aria-live="polite"></div>
+        <label class="completion-push-option"><input type="checkbox" id="completionPushEnabled"> Receive Completion Push Notification</label>
+        <p class="muted small-note">Off by default. The task creator receives an in-app completion notice regardless, but a push alert is sent only when this is selected.</p>
+      </section>
       <div class="modal-actions"><button type="button" class="secondary-button" id="deleteTaskButton" hidden>Delete task</button><span></span><button class="primary-button" id="saveTaskButton" value="save">Save task</button></div>
     </form>
+  </dialog>
+
+  <dialog id="notificationDialog" class="modal notification-modal">
+    <div class="modal-head"><div><span class="eyebrow">HOUSEHOLD UPDATES</span><h2>Notifications</h2></div><button class="close-button" id="closeNotifications" aria-label="Close">×</button></div>
+    <div id="notificationCenterContent" class="notification-center-content"></div>
   </dialog>
 
   <dialog id="personDialog" class="modal small-modal">
