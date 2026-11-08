@@ -244,6 +244,50 @@ function render() {
       }).join("")
     : "Away Mode is currently off.";
 }
+
+const WIWY_VAPID_PUBLIC_KEY = "BAbz1r7e2cel3EAcDrGCIgjn3JLxbH28Qu3FiM366-L58-dzLBeVSHw7YDfh1xEzpJLBLx0SaiwRJXAyKOdEEcU";
+function pushBase64ToBytes(value) {
+  const padding = "=".repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
+}
+async function enablePushNotifications() {
+  const button = $("enablePushButton");
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    toast("Push notifications are not supported by this browser. In-app notifications will still work.");
+    return;
+  }
+  button.disabled = true; button.textContent = "Enabling…";
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      toast(permission === "denied" ? "Notifications are blocked in browser settings. In-app notifications remain available." : "Notifications were not enabled. You can try again here later.");
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true, applicationServerKey: pushBase64ToBytes(WIWY_VAPID_PUBLIC_KEY)
+    });
+    const authClient = window.WIWY_AUTH?.client;
+    const currentUser = await authClient?.auth.getUser();
+    if (!authClient || currentUser?.error || !currentUser?.data?.user?.id) throw new Error("Your WIWY account session could not be verified. Please sign in again.");
+    const payload = subscription.toJSON();
+    const { error } = await authClient.from("push_subscriptions").upsert({
+      user_id: currentUser.data.user.id, endpoint: subscription.endpoint, subscription: payload, user_agent: navigator.userAgent, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", updated_at: new Date().toISOString()
+    }, { onConflict: "endpoint" });
+    if (error) throw error;
+    button.textContent = "Push notifications enabled";
+    toast("This device is registered for WIWY push notifications.");
+  } catch (error) {
+    console.error("WIWY push registration:", error);
+    toast("Could not enable push notifications: " + (error.message || "Unknown error"));
+  } finally {
+    button.disabled = false;
+    if (Notification.permission === "granted") button.textContent = "Enable push on this device";
+  }
+}
 function esc(s="") { return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function populatePeopleSelects() {
   const people=Cloud.getState().people;
@@ -285,10 +329,11 @@ function renderNotificationCenter() {
   const completions=records.filter(n=>n.notification_type==="completion");
   const household=records.filter(n=>n.notification_type==="household");
   const assignments=records.filter(n=>n.notification_type==="assignment");
+  const reminderNotices=records.filter(n=>n.notification_type==="reminder");
   const row=(title,detail,meta="",id="",read=true)=>`<div class="notification-row ${read?"":"unread"}"><div class="notification-row-copy"><strong>${esc(title)}</strong><span>${esc(detail)}</span>${meta?`<small>${esc(meta)}</small>`:""}</div>${id&&!read?`<button type="button" class="secondary-button notification-read-button" data-notification-read="${esc(id)}">Mark read</button>`:""}</div>`;
   const section=(name,description,items,empty)=>`<section class="notification-section"><div class="notification-section-head"><h3>${name}</h3><span>${description}</span></div>${items.length?items.join(""):`<p class="notification-empty">${empty}</p>`}</section>`;
   const assignmentRows=assigned.map(t=>row(t.name,`Assigned to you · ${t.repeat==="once"?"One-time":"Recurring"}`,t.start?`Starts ${notificationTaskWhen(t)}`:"No start time set"));
-  const reminderRows=reminders.map(t=>row(t.name,`Scheduled reminder · ${notificationTaskWhen(t)}`,(t.advanceReminderOffsets||[]).length?`Additional: ${t.advanceReminderOffsets.map(reminderOffsetLabel).join(", ")}`:"At scheduled start"));
+  const reminderRows=reminderNotices.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at)).concat(reminders.map(t=>row(t.name,`Scheduled reminder · ${notificationTaskWhen(t)}`,(t.advanceReminderOffsets||[]).length?`Additional: ${t.advanceReminderOffsets.map(reminderOffsetLabel).join(", ")}`:"At scheduled start")));
   const completionRows=completions.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at));
   const householdRows=household.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at));
   const assignmentUnread=assignments.filter(n=>!n.read_at);
@@ -464,6 +509,7 @@ function setup() {
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSidebar(); });
   $("workspaceButton").onclick=()=>toast("Workspace switching will be added with account and invitation support.");
   $("notificationButton").onclick=()=>{renderNotificationCenter();$("notificationDialog").showModal();};
+  $("enablePushButton").onclick=enablePushNotifications;
   $("closeNotifications").onclick=()=>$("notificationDialog").close();
   $("notificationCenterContent").addEventListener("click",async e=>{
     const button=e.target.closest("[data-notification-read]");
