@@ -6,6 +6,7 @@ let user = null;
 let state = { people: [], tasks: [] };
 let activity = [];
 let awayPeriods = [];
+let notifications = [];
 let permissions = new Set();
 let channel = null;
 let refreshBusy = false;
@@ -38,6 +39,7 @@ const mapTask = (row, ops, assignments, occurrences, completions) => {
     assigneeIds, repeat: r.type || "once", weekdays: r.weekdays || [],
     date: r.date || null, start: row.start_time || null, end: row.end_time || null,
     notes: row.notes || "", archived: Boolean(row.archived_at),
+    advanceReminderOffsets: row.advance_reminder_offsets || [], completionPushEnabled: !!row.completion_push_enabled,
     createdBy: row.created_by, createdAt: row.created_at,
     operations: ops.filter(o => o.task_id === row.id)
       .sort((a,b) => a.sort_order - b.sort_order)
@@ -56,6 +58,12 @@ const mapTask = (row, ops, assignments, occurrences, completions) => {
 export function getState() { return structuredClone(state); }
 export function getActivity() { return structuredClone(activity); }
 export function getAwayPeriods() { return structuredClone(awayPeriods); }
+export function getNotifications() { return structuredClone(notifications); }
+export async function markNotificationRead(id) {
+  const { error } = await client.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id);
+  if (error) throw error;
+  const row = notifications.find(n=>n.id===id); if (row) row.read_at = new Date().toISOString();
+}
 export function canManageAway() { return isAdmin() || membership?.role === "Manager"; }
 export function getCurrentUser() { return user; }
 export function getMembership() { return membership; }
@@ -112,6 +120,7 @@ export async function initialize(authClient, activeWorkspace, activeMembership, 
     .on("postgres_changes", { event:"*", schema:"public", table:"task_operation_completions", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"activity_ledger", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"away_periods", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"notifications", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .subscribe();
   // Polling is a fallback if Realtime is not enabled for these tables.
   refreshTimer = setInterval(() => refreshQuietly(), 20000);
@@ -127,16 +136,19 @@ export async function refresh() {
   if (refreshBusy) return getState();
   refreshBusy = true;
   try {
-    const [peopleRes, taskRes, activityRes, awayRes] = await Promise.all([
+    const [peopleRes, taskRes, activityRes, awayRes, notificationRes] = await Promise.all([
       client.from("member_profiles").select("id,workspace_id,display_name,color,created_at").eq("workspace_id", workspace.id).order("created_at"),
-      client.from("tasks").select("id,workspace_id,name,assignee_profile_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
+      client.from("tasks").select("id,workspace_id,name,assignee_profile_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at,advance_reminder_offsets,completion_push_enabled").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
       client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
-      client.from("away_periods").select("id,workspace_id,member_profile_id,starts_at,ends_at,is_active,created_by").eq("workspace_id", workspace.id).eq("is_active", true).order("starts_at", {ascending:false})
+      client.from("away_periods").select("id,workspace_id,member_profile_id,starts_at,ends_at,is_active,created_by").eq("workspace_id", workspace.id).eq("is_active", true).order("starts_at", {ascending:false}),
+      client.from("notifications").select("id,notification_type,title,body,task_id,occurrence_id,occurrence_date,push_requested,created_at,read_at,event_key").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100)
     ]);
     if (peopleRes.error) throw peopleRes.error;
     if (taskRes.error) throw taskRes.error;
     if (activityRes.error) throw activityRes.error;
     if (awayRes.error) throw awayRes.error;
+    if (notificationRes.error) throw notificationRes.error;
+    notifications = notificationRes.data || [];
     awayPeriods = (awayRes.data || []).filter(p => !p.ends_at || new Date(p.ends_at) > new Date());
     const profileNames = new Map((peopleRes.data || []).map(p => [p.id,p.display_name]));
     activity = (activityRes.data || []).map(row => ({
@@ -197,7 +209,10 @@ function taskPayload(task) {
     workspace_id: workspace.id, name: task.name.trim(),
     assignee_profile_id: (task.assigneeIds || []).length ? task.assigneeIds[0] : null,
     recurrence, start_time: task.start || null, end_time: task.end || null,
-    notes: task.notes || "", updated_at: new Date().toISOString()
+    notes: task.notes || "",
+    advance_reminder_offsets: task.advanceReminderOffsets || [],
+    completion_push_enabled: !!task.completionPushEnabled,
+    updated_at: new Date().toISOString()
   };
 }
 async function replaceChildren(taskId, task, assigneeIds) {
@@ -356,6 +371,12 @@ function tomorrowAtFiveInWorkspaceTimezone() {
 export async function enableAway({scope, memberProfileId, duration}) {
   if (!canManageAway()) throw new Error("Only a Manager or Admin can manage Away Mode.");
   if (scope === "person" && !memberProfileId) throw new Error("Choose a household member.");
+  const duplicate=awayPeriods.some(p=>scope==="workspace"
+    ? p.member_profile_id===null
+    : p.member_profile_id===memberProfileId);
+  if(duplicate) throw new Error(scope==="workspace"
+    ? "Away Mode is already active for the entire household."
+    : "Away Mode is already active for this person.");
   const endsAt = duration === "indefinite" ? null : tomorrowAtFiveInWorkspaceTimezone();
   const {error} = await client.from("away_periods").insert({
     workspace_id:workspace.id,

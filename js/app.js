@@ -230,6 +230,9 @@ function render() {
   renderToday();renderTasks();renderMeals();renderGroceries();renderPeople();renderLedger();renderCalendar();
   const away=Cloud.getAwayPeriods();
   $("awayButton").innerHTML=away.length?`☼ <span class="desktop-only">Away mode on</span>`:`☼ <span class="desktop-only">Away mode</span>`;
+  const unreadNotifications=Cloud.getNotifications().filter(n=>!n.read_at).length;
+  $("notificationButton").classList.toggle("has-unread",unreadNotifications>0);
+  $("notificationButton").setAttribute("aria-label",unreadNotifications?`Notifications, ${unreadNotifications} unread`:"Notifications");
   $("awayButton").disabled=!Cloud.canManageAway();
   const people=Cloud.getState().people;
   $("awayStatus").innerHTML=away.length
@@ -247,6 +250,55 @@ function populatePeopleSelects() {
   $("taskAssigneeOptions").innerHTML=people.length?people.map(p=>`<label class="assignee-option"><input type="checkbox" value="${p.id}" data-assignee-option> <span>${esc(p.name)}</span></label>`).join(""):empty("No household profiles yet","An Admin or authorized Manager can add people first.");
   $("awayPerson").innerHTML=`<option value="">Select a person</option>`+people.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("");
 }
+
+function reminderOffsetLabel(minutes) {
+  if (minutes % 1440 === 0) return `${minutes/1440} day${minutes/1440===1?"":"s"} before`;
+  if (minutes % 60 === 0) return `${minutes/60} hour${minutes/60===1?"":"s"} before`;
+  return `${minutes} minutes before`;
+}
+function selectedReminderOffsets() {
+  const presets=[...document.querySelectorAll("[data-reminder-offset]:checked")].map(x=>Number(x.dataset.reminderOffset));
+  return [...new Set([...presets,...customReminderOffsets])].sort((a,b)=>b-a);
+}
+function renderCustomReminderOffsets() {
+  $("selectedCustomReminders").innerHTML=customReminderOffsets.map(v=>`<span class="selected-reminder">${esc(reminderOffsetLabel(v))}<button type="button" data-remove-reminder="${v}" aria-label="Remove reminder">×</button></span>`).join("");
+}
+function notificationTaskDate(task) {
+  const now=new Date();
+  if(task.repeat==="once") return task.date || keyDate();
+  for(let i=0;i<60;i++){const d=addDays(now,i), key=keyDate(d);if(task.repeat==="daily" || (task.repeat==="weekdays" && (task.weekdays||[]).includes(d.getDay())))return key;}
+  return keyDate();
+}
+function notificationTaskWhen(task, offset=0) {
+  const date=notificationTaskDate(task);
+  if(!task.start)return `${date} · No start time set`;
+  const [h,m]=task.start.split(":").map(Number);
+  const dt=new Date(`${date}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`);
+  dt.setMinutes(dt.getMinutes()-offset);
+  return dt.toLocaleString([], {weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+}
+function renderNotificationCenter() {
+  const current=Cloud.getState(), profile=Cloud.getMembership()?.member_profile_id;
+  const assigned=current.tasks.filter(t=>!t.archived&&(t.assigneeIds||[]).includes(profile));
+  const reminders=assigned.filter(t=>t.start);
+  const records=Cloud.getNotifications();
+  const completions=records.filter(n=>n.notification_type==="completion");
+  const household=records.filter(n=>n.notification_type==="household");
+  const assignments=records.filter(n=>n.notification_type==="assignment");
+  const row=(title,detail,meta="",id="",read=true)=>`<div class="notification-row ${read?"":"unread"}"><div class="notification-row-copy"><strong>${esc(title)}</strong><span>${esc(detail)}</span>${meta?`<small>${esc(meta)}</small>`:""}</div>${id&&!read?`<button type="button" class="secondary-button notification-read-button" data-notification-read="${esc(id)}">Mark read</button>`:""}</div>`;
+  const section=(name,description,items,empty)=>`<section class="notification-section"><div class="notification-section-head"><h3>${name}</h3><span>${description}</span></div>${items.length?items.join(""):`<p class="notification-empty">${empty}</p>`}</section>`;
+  const assignmentRows=assigned.map(t=>row(t.name,`Assigned to you · ${t.repeat==="once"?"One-time":"Recurring"}`,t.start?`Starts ${notificationTaskWhen(t)}`:"No start time set"));
+  const reminderRows=reminders.map(t=>row(t.name,`Scheduled reminder · ${notificationTaskWhen(t)}`,(t.advanceReminderOffsets||[]).length?`Additional: ${t.advanceReminderOffsets.map(reminderOffsetLabel).join(", ")}`:"At scheduled start"));
+  const completionRows=completions.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at));
+  const householdRows=household.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at));
+  const assignmentUnread=assignments.filter(n=>!n.read_at);
+  const assignmentFeed=assignmentRows.concat(assignmentUnread.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,true)));
+  $("notificationCenterContent").innerHTML=
+    section("Assignment","All tasks assigned to you",assignmentFeed,"No tasks are currently assigned to you.")+
+    section("Reminder","Upcoming tasks with scheduled reminders",reminderRows,"No upcoming task reminders.")+
+    section("Completion","Tasks you created that someone else completed",completionRows,"No completion updates yet.")+
+    section("Household","General household announcements",householdRows,"No household announcements.");
+}
 function taskEditorSnapshot() {
   return JSON.stringify({
     name:$("taskName").value.trim(),
@@ -256,6 +308,7 @@ function taskEditorSnapshot() {
     start:$("taskStart").value,
     end:$("taskEnd").value,
     notes:$("taskNotes").value.trim(),
+    reminderOffsets:selectedReminderOffsets(), completionPushEnabled:$("completionPushEnabled").checked,
     operations:operations.map(o=>({name:o.name,required:o.required!==false}))
   });
 }
@@ -263,7 +316,7 @@ function taskEditorHasChanges() {
   return taskEditorSnapshot() !== ($("taskEditor").dataset.initialSnapshot || taskEditorSnapshot());
 }
 function openTask(task=null) {
-  populatePeopleSelects(); $("taskEditor").reset(); operations=[]; selectedDays=new Set();
+  populatePeopleSelects(); $("taskEditor").reset(); operations=[]; selectedDays=new Set(); customReminderOffsets=[];
   $("taskId").value=task?.id||""; $("taskDialogTitle").textContent=task?"Edit task":"Create a task";
   $("taskFormError").hidden=true; $("taskFormError").textContent="";
   $("taskName").value=task?.name||""; 
@@ -272,6 +325,11 @@ function openTask(task=null) {
   document.querySelectorAll("[data-assignee-option]").forEach(o=>{o.checked=assigned.has(o.value);o.disabled=!Cloud.canAssignAnyone();});
   $("taskRepeat").value=task?.repeat||"once";
   $("taskStart").value=task?.start||""; $("taskEnd").value=task?.end||""; $("taskNotes").value=task?.notes||"";
+  const savedOffsets=task?.advanceReminderOffsets||[];
+  document.querySelectorAll("[data-reminder-offset]").forEach(x=>x.checked=savedOffsets.includes(Number(x.dataset.reminderOffset)));
+  customReminderOffsets=savedOffsets.filter(x=>![5,15,30,60].includes(x));
+  $("completionPushEnabled").checked=!!task?.completionPushEnabled;
+  renderCustomReminderOffsets();
   if(task?.weekdays) selectedDays=new Set(task.weekdays);
   operations=(task?.operations||[]).map(o=>({...o}));
   $("deleteTaskButton").hidden=!(task && Cloud.canManageTask(task));
@@ -303,7 +361,7 @@ function renderWeekdays() { document.querySelectorAll("[data-day]").forEach(b=>b
 async function saveTaskFromForm() {
   const id=$("taskId").value, repeat=$("taskRepeat").value;
   if(repeat==="weekdays"&&!selectedDays.size){toast("Choose at least one weekday.");return false;}
-  const task={id:id||undefined,name:$("taskName").value.trim(),assigneeIds:[...document.querySelectorAll("[data-assignee-option]:checked")].map(o=>o.value),repeat,weekdays:repeat==="weekdays"?[...selectedDays]:[],date:repeat==="once"?keyDate():null,start:$("taskStart").value||null,end:$("taskEnd").value||null,operations,notes:$("taskNotes").value.trim()};
+  const task={id:id||undefined,name:$("taskName").value.trim(),assigneeIds:[...document.querySelectorAll("[data-assignee-option]:checked")].map(o=>o.value),repeat,weekdays:repeat==="weekdays"?[...selectedDays]:[],date:repeat==="once"?keyDate():null,start:$("taskStart").value||null,end:$("taskEnd").value||null,operations,notes:$("taskNotes").value.trim(),advanceReminderOffsets:selectedReminderOffsets(),completionPushEnabled:$("completionPushEnabled").checked};
   if(!task.name)return false;
   const errorBox=$("taskFormError");errorBox.hidden=true;errorBox.textContent="";
   try { await Cloud.saveTask(task); $("taskDialog").close(); render(); toast("✓ Task created and saved to your household."); return true; }
@@ -378,7 +436,7 @@ function setup() {
   $("exportData").onclick=()=>{const blob=new Blob([Store.exportState()],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wiwy-backup-"+keyDate()+".json";a.click();URL.revokeObjectURL(a.href);};
   $("importData").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{Store.importState(JSON.parse(await f.text()));render();toast("Backup imported.");}catch(err){alert(err.message);}e.target.value="";};
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
-  $("awayEditor").addEventListener("submit",async e=>{e.preventDefault();const scope=$("awayScope").value;try{await Cloud.enableAway({scope,memberProfileId:scope==="person"?$("awayPerson").value:null,duration:$("awayDuration").value});$("awayDialog").close();render();toast("✓ Away Mode enabled.");}catch(error){$("awayStatus").textContent=error.message;}});
+  $("awayEditor").addEventListener("submit",async e=>{e.preventDefault();const scope=$("awayScope").value,submit=e.submitter; if(submit)submit.disabled=true;try{await Cloud.enableAway({scope,memberProfileId:scope==="person"?$("awayPerson").value:null,duration:$("awayDuration").value});$("awayDialog").close();render();toast("✓ Away Mode enabled.");}catch(error){$("awayStatus").textContent=error.message;toast(error.message);}finally{if(submit)submit.disabled=false;}});
   $("awayStatus").addEventListener("click",async e=>{
     const button=e.target.closest("[data-away-period]");
     if(!button)return;
@@ -400,7 +458,30 @@ function setup() {
   $("sidebarBackdrop").onclick=closeSidebar;
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSidebar(); });
   $("workspaceButton").onclick=()=>toast("Workspace switching will be added with account and invitation support.");
-  $("notificationButton").onclick=()=>toast("Notifications are planned for the next build stage.");
+  $("notificationButton").onclick=()=>{renderNotificationCenter();$("notificationDialog").showModal();};
+  $("closeNotifications").onclick=()=>$("notificationDialog").close();
+  $("notificationCenterContent").addEventListener("click",async e=>{
+    const button=e.target.closest("[data-notification-read]");
+    if(!button)return;
+    button.disabled=true;
+    try{await Cloud.markNotificationRead(button.dataset.notificationRead);renderNotificationCenter();}
+    catch(error){button.disabled=false;toast("Could not mark notification read: "+error.message);}
+  });
+  document.querySelectorAll("[data-reminder-offset]").forEach(x=>x.addEventListener("change",()=>{}));
+  $("addCustomReminder").onclick=()=>{
+    const amount=Number($("customReminderAmount").value),unit=$("customReminderUnit").value;
+    if(!Number.isInteger(amount)||amount<1){toast("Enter a valid reminder interval.");return;}
+    const minutes=amount*(unit==="days"?1440:unit==="hours"?60:1);
+    if(minutes>43200){toast("Custom reminders can be up to 30 days in advance.");return;}
+    if(selectedReminderOffsets().includes(minutes)){toast("That reminder is already selected.");return;}
+    customReminderOffsets=[...new Set([...customReminderOffsets,minutes])];
+    renderCustomReminderOffsets();
+  };
+  $("selectedCustomReminders").addEventListener("click",e=>{
+    const b=e.target.closest("[data-remove-reminder]");if(!b)return;
+    customReminderOffsets=customReminderOffsets.filter(v=>v!==Number(b.dataset.removeReminder));
+    renderCustomReminderOffsets();
+  });
   $("profileButton").onclick=()=>{
     const menu = $("accountMenu");
     menu.hidden = !menu.hidden;
