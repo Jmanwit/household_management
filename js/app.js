@@ -387,7 +387,9 @@ function setup() {
   });
   $("closeTaskDetail").onclick=()=>$("taskDetailDialog").close();
   $("pageBack").onclick=goBack;
-  $("quickAddTask").onclick=$("newTaskButton").onclick=()=>openTask();
+  const launchTaskEditor = (event) => { event?.preventDefault(); event?.stopPropagation(); try { openTask(); } catch(error) { console.error("Could not open task editor:", error); toast("Could not open the task editor: " + error.message); } };
+  $("quickAddTask").addEventListener("click", launchTaskEditor);
+  $("newTaskButton").addEventListener("click", launchTaskEditor);
   $("taskRepeat").onchange=()=>{$("weekdayPicker").hidden=$("taskRepeat").value!=="weekdays";};
   document.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{const d=Number(b.dataset.day);selectedDays.has(d)?selectedDays.delete(d):selectedDays.add(d);renderWeekdays();});
   $("addOperation").onclick=()=>{const v=$("newOperation").value.trim();if(v){operations.push({name:v,required:true});$("newOperation").value="";renderOperations();}};
@@ -398,8 +400,10 @@ function setup() {
   $("taskEditor").addEventListener("submit",e=>{e.preventDefault();saveTaskFromForm();});
   $("deleteTaskButton").onclick=async()=>{const id=$("taskId").value;if(id&&await askWIWYConfirm("Delete task?","This removes the task definition. This action cannot be undone.","Delete task")){try{await Cloud.deleteTask(id);$("taskDialog").close();render();toast("Task deleted.");}catch(error){toast("Could not delete task: "+error.message);}}};
   $("taskList").addEventListener("click",async e=>{
-    const edit=e.target.dataset.editTask;if(edit)openTask(Cloud.getState().tasks.find(t=>t.id===edit));
-    const complete=e.target.dataset.complete;
+    const editButton=e.target.closest("[data-edit-task]");
+    if(editButton){const edit=editButton.dataset.editTask;const task=Cloud.getState().tasks.find(t=>t.id===edit);if(task)openTask(task);return;}
+    const completeButton=e.target.closest("[data-complete]");
+    const complete=completeButton?.dataset.complete;
     if(complete){const task=Cloud.getState().tasks.find(t=>t.id===complete);try{
       if(task.operations?.length>=2){if(!await askWIWYConfirm("Complete this task?","Are all steps for this task complete? Confirming will mark every step complete.","Complete task"))return;await Cloud.completeAllStepsAndTask(complete,keyDate());}
       else if(task.operations?.length===1){await Cloud.completeAllStepsAndTask(complete,keyDate());}
@@ -416,6 +420,7 @@ function setup() {
   document.querySelectorAll("[data-task-filter]").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.taskFilter;document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x===b));renderTasks();});
   document.querySelectorAll("[data-summary-filter]").forEach(card=>{card.setAttribute("role","button");card.setAttribute("tabindex","0");card.setAttribute("aria-label","Show "+card.dataset.summaryFilter+" tasks");const activate=()=>{taskFilter=card.dataset.summaryFilter;setView("tasks");document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x.dataset.taskFilter===taskFilter));renderTasks();};card.addEventListener("click",activate);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate();}});});
   $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
+  $("closePersonEditor").onclick=(event)=>{event.preventDefault();$("personDialog").close();};
   $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(name){const errorBox=$("personFormError");errorBox.hidden=true;errorBox.textContent="";try{await Cloud.addPerson({name,color:$("personColor").value});$("personDialog").close();populatePeopleSelects();render();toast("✓ Household member added.");}catch(error){errorBox.textContent="Could not add person: "+error.message;errorBox.hidden=false;}}});
   $("addMealButton").onclick=()=>{$("mealEditor").reset();$("mealDialog").showModal();};
   $("mealEditor").addEventListener("submit",e=>{e.preventDefault();Store.addMeal({day:$("mealDay").value,name:$("mealName").value.trim(),notes:$("mealNotes").value.trim()});$("mealDialog").close();render();toast("Meal added.");});
