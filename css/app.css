@@ -289,3 +289,7 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 /* 0.8.1 hotfix: restrained outline notification bell */
 .notification-bell{width:21px;height:21px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .notification-button{display:grid;place-items:center}
+
+.push-setup-copy { color: var(--muted, #817a6c); margin: 0 0 10px; font-size: .92rem; line-height: 1.5; }
+.push-enable-button { margin: 0 0 18px; }
+.push-enable-button:disabled { opacity: .65; cursor: wait; }
