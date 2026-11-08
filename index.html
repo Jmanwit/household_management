@@ -43,7 +43,7 @@
         <div><div class="eyebrow" id="dateLabel">YOUR HOUSEHOLD</div><h1 id="pageTitle">Today</h1></div>
         <div class="top-actions">
           <button class="icon-button" id="awayButton" title="Away mode synchronization is coming later" disabled>☼ <span class="desktop-only">Away mode</span></button>
-          <button class="icon-button notification-button" id="notificationButton" title="Notifications" aria-label="Notifications">🔔<i></i></button>
+          <button type="button" class="icon-button notification-button" id="notificationButton" title="Notifications" aria-label="Notifications"><svg class="notification-bell" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i></i></button>
           <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false">♙</button>
           <div id="accountMenu" class="account-menu" hidden>
             <div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div>
@@ -166,7 +166,7 @@
   </dialog>
 
   <dialog id="personDialog" class="modal small-modal">
-    <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button class="close-button" value="cancel">×</button></div><div id="personFormError" class="form-error" role="alert" hidden></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
+    <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button type="button" class="close-button" id="closePersonEditor" aria-label="Close">×</button></div><div id="personFormError" class="form-error" role="alert" hidden></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
   </dialog>
 
   <dialog id="mealDialog" class="modal small-modal">
