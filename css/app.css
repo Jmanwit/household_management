@@ -252,3 +252,36 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 }
 
 .away-status{padding:10px 12px;border-radius:9px;background:var(--surface2);color:var(--muted);font-size:.88rem;line-height:1.5}.away-status-heading{font-weight:700;color:var(--ink);margin-bottom:8px}.away-period-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}.away-period-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.away-period-copy strong{color:var(--ink);font-size:.92rem}.away-period-copy span{font-size:.82rem}.away-cancel-button{flex:0 0 auto;padding:8px 11px;font-size:.82rem}
+
+
+/* WIWY 0.8.1 — notification center and task reminder controls */
+.notification-button { position:relative; }
+.notification-button.has-unread i { position:absolute; width:9px; height:9px; border-radius:50%; background:#b85e43; top:7px; right:7px; border:2px solid var(--surface, #fff); }
+.notification-modal { width:min(680px, calc(100vw - 28px)); max-height:88vh; overflow:auto; }
+.notification-center-content { display:grid; gap:20px; padding:4px 0 12px; }
+.notification-section { display:grid; gap:8px; }
+.notification-section-head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 12px; border-bottom:1px solid var(--line, #ded8cc); padding-bottom:7px; }
+.notification-section-head h3 { margin:0; font-family:inherit; font-size:1rem; }
+.notification-section-head span,.notification-empty { color:var(--muted, #777); font-size:.82rem; margin:0; }
+.notification-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border-radius:10px; background:var(--panel, #f8f6f0); }
+.notification-row.unread { border-left:3px solid var(--accent, #6e927d); }
+.notification-row-copy { display:grid; gap:3px; min-width:0; }
+.notification-row-copy strong { font-size:.92rem; }
+.notification-row-copy span,.notification-row-copy small { color:var(--muted, #777); font-size:.82rem; overflow-wrap:anywhere; }
+.notification-read-button { flex:none; font-size:.76rem; padding:7px 9px; }
+.task-reminder-settings { border:1px solid var(--line, #ded8cc); border-radius:12px; padding:14px; display:grid; gap:11px; margin-top:4px; }
+.reminder-heading { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+.task-reminder-settings p { margin:0; }
+.reminder-start-default { display:flex; justify-content:space-between; padding:9px 11px; border-radius:8px; background:var(--panel, #f8f6f0); font-size:.88rem; }
+.reminder-start-default span { color:var(--muted, #777); font-size:.78rem; }
+.reminder-presets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.reminder-presets label,.completion-push-option { display:flex; align-items:center; gap:8px; font-size:.88rem; }
+.custom-reminder-controls { display:flex; align-items:center; gap:7px; margin-top:5px; }
+.custom-reminder-controls input { width:76px; }
+.custom-reminder-controls select { min-width:112px; }
+.selected-reminders { display:flex; flex-wrap:wrap; gap:7px; }
+.selected-reminder { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line, #ded8cc); border-radius:20px; padding:4px 9px; font-size:.78rem; }
+.selected-reminder button { border:0; background:transparent; font-size:1rem; padding:0 2px; cursor:pointer; }
+.completion-push-option { padding-top:10px; border-top:1px solid var(--line, #ded8cc); font-weight:600; }
+.small-note { font-size:.78rem; }
+@media(max-width:520px) { .reminder-presets { grid-template-columns:1fr; } .notification-row { align-items:flex-start; } .custom-reminder-controls { flex-wrap:wrap; } }
