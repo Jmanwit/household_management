@@ -7,6 +7,7 @@ let state = { people: [], tasks: [] };
 let activity = [];
 let awayPeriods = [];
 let notifications = [];
+let removalRequests = [];
 let permissions = new Set();
 let channel = null;
 let refreshBusy = false;
@@ -59,6 +60,7 @@ export function getState() { return structuredClone(state); }
 export function getActivity() { return structuredClone(activity); }
 export function getAwayPeriods() { return structuredClone(awayPeriods); }
 export function getNotifications() { return structuredClone(notifications); }
+export function getRemovalRequests() { return structuredClone(removalRequests); }
 export async function markNotificationRead(id) {
   const { error } = await client.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id);
   if (error) throw error;
@@ -114,6 +116,7 @@ export async function initialize(authClient, activeWorkspace, activeMembership, 
   channel = client.channel(`wiwy-workspace-${workspace.id}`)
     .on("postgres_changes", { event:"*", schema:"public", table:"tasks", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"member_profiles", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"profile_removal_requests", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_occurrences", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_assignments" }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_operations" }, () => refreshQuietly())
@@ -136,19 +139,27 @@ export async function refresh() {
   if (refreshBusy) return getState();
   refreshBusy = true;
   try {
-    const [peopleRes, taskRes, activityRes, awayRes, notificationRes] = await Promise.all([
-      client.from("member_profiles").select("id,workspace_id,display_name,color,created_at").eq("workspace_id", workspace.id).order("created_at"),
+    // Members do not have removal-request read permission; do not query that table for them.
+    const requestQuery = (membership?.role === "Admin" || membership?.role === "Manager")
+      ? client.from("profile_removal_requests").select("id,workspace_id,profile_id,requested_by,status,requested_at,reviewed_by,reviewed_at,review_note").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", {ascending:true})
+      : Promise.resolve({ data: [], error: null });
+    const [peopleRes, taskRes, activityRes, awayRes, notificationRes, requestRes] = await Promise.all([
+      client.from("member_profiles").select("id,workspace_id,display_name,color,is_active,created_at").eq("workspace_id", workspace.id).order("created_at"),
       client.from("tasks").select("id,workspace_id,name,assignee_profile_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at,advance_reminder_offsets,completion_push_enabled").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
       client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
       client.from("away_periods").select("id,workspace_id,member_profile_id,starts_at,ends_at,is_active,created_by").eq("workspace_id", workspace.id).eq("is_active", true).order("starts_at", {ascending:false}),
-      client.from("notifications").select("id,notification_type,title,body,task_id,occurrence_id,occurrence_date,push_requested,created_at,read_at,event_key").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100)
+      client.from("notifications").select("id,notification_type,title,body,task_id,occurrence_id,occurrence_date,push_requested,created_at,read_at,event_key").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
+      requestQuery
     ]);
     if (peopleRes.error) throw peopleRes.error;
     if (taskRes.error) throw taskRes.error;
     if (activityRes.error) throw activityRes.error;
     if (awayRes.error) throw awayRes.error;
     if (notificationRes.error) throw notificationRes.error;
+    if (requestRes.error) throw requestRes.error;
     notifications = notificationRes.data || [];
+    removalRequests = requestRes.data || [];
+
     awayPeriods = (awayRes.data || []).filter(p => !p.ends_at || new Date(p.ends_at) > new Date());
     const profileNames = new Map((peopleRes.data || []).map(p => [p.id,p.display_name]));
     activity = (activityRes.data || []).map(row => ({
@@ -185,12 +196,37 @@ export async function refresh() {
       }
     }
     state = {
-      people: (peopleRes.data || []).map(p => ({id:p.id,name:p.display_name,color:p.color,role:"Household member",accountId:null})),
+      people: (peopleRes.data || []).map(p => ({id:p.id,name:p.display_name,color:p.color,active:p.is_active !== false,role:"Household member",accountId:null})),
       tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences, completions))
     };
     return getState();
   } finally { refreshBusy = false; }
 }
+export async function requestProfileRemoval(profileId) {
+  if (membership?.role !== "Manager") throw new Error("Only a household Manager may request profile removal.");
+  const { error } = await client.rpc("wiwy_request_profile_removal", { target_profile: profileId });
+  if (error) throw error;
+  await recordActivity("Requested household member removal", "member_profile", profileId, {});
+  await refresh();
+}
+export async function setProfileActive(profileId, active) {
+  if (!isAdmin()) throw new Error("Only this household's Admin can change profile activation.");
+  const rpc = active ? "wiwy_admin_reactivate_profile" : "wiwy_admin_deactivate_profile";
+  const { error } = await client.rpc(rpc, { target_profile: profileId });
+  if (error) throw error;
+  await recordActivity(active ? "Reactivated household member" : "Deactivated household member", "member_profile", profileId, {});
+  await refresh();
+}
+export async function reviewProfileRemoval(requestId, approve) {
+  if (!isAdmin()) throw new Error("Only this household's Admin can review removal requests.");
+  const { error } = await client.rpc("wiwy_admin_review_profile_removal", {
+    target_request: requestId, approve: !!approve, decision_note: null
+  });
+  if (error) throw error;
+  await recordActivity(approve ? "Approved household member removal" : "Declined household member removal", "profile_removal_request", requestId, {});
+  await refresh();
+}
+
 export async function addPerson(person) {
   if (!canManageProfiles()) throw new Error("You don't have permission to add household profiles.");
   const { data, error } = await client.from("member_profiles").insert({

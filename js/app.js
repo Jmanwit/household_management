@@ -14,8 +14,16 @@ let authenticatedWorkspace = null;
 let signedInUser = null;
 
 function toast(message) {
-  $("toast").textContent = message; $("toast").classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(()=>$("toast").classList.remove("show"), 4200);
+  const el = $("toast");
+  el.textContent = message;
+  clearTimeout(toastTimer);
+  el.classList.add("show");
+  // Popovers enter the browser top layer, above modal dialogs and their backdrops.
+  try { if (!el.matches(":popover-open")) el.showPopover(); } catch (_) { /* CSS fallback below */ }
+  toastTimer = setTimeout(() => {
+    el.classList.remove("show");
+    try { if (el.matches(":popover-open")) el.hidePopover(); } catch (_) {}
+  }, 4800);
 }
 function keyDate(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function dateLabel(d = new Date()) { return d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}); }
@@ -166,9 +174,38 @@ function renderGroceries() {
   $("groceryList").innerHTML=items.length?items.map(i=>`<div class="grocery-row ${i.done?"done":""}"><input type="checkbox" data-grocery="${i.id}" ${i.done?"checked":""} disabled style="width:17px;height:17px"><label>${esc(i.name)}</label><span class="grocery-category">${esc(i.category)}</span></div>`).join(""):empty("Your list is clear.","Add groceries, ingredients, and household supplies.");
 }
 function renderPeople() {
-  const people=Cloud.getState().people;
-  $("addPersonButton").hidden=!Cloud.canManageProfiles();
-  $("peopleGrid").innerHTML=people.length?people.map(p=>`<article class="person-card"><div class="person-avatar" style="background:${p.color}">${esc(p.name.slice(0,1).toUpperCase())}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)} · ${p.accountId?"Account linked":"Member profile"}</p></article>`).join(""):empty("Start with your people.","Add member profiles now. Accounts and invitations can be linked later.");
+  const people = Cloud.getState().people;
+  const admin = Cloud.isAdmin();
+  const manager = Cloud.getMembership()?.role === "Manager";
+  const requests = Cloud.getRemovalRequests();
+  $("addPersonButton").hidden = !Cloud.canManageProfiles();
+
+  const requestPanel = admin && requests.length ? `
+    <section class="panel member-requests">
+      <div class="panel-heading"><h3>Removal requests</h3><span class="eyebrow">ADMIN REVIEW</span></div>
+      ${requests.map(r => {
+        const person = people.find(p => p.id === r.profile_id);
+        const requested = r.requested_at ? new Date(r.requested_at).toLocaleDateString() : "";
+        return `<div class="request-row">
+          <span><strong>${esc(person?.name || "Household member")}</strong><small>Requested ${esc(requested)}</small></span>
+          <button type="button" class="secondary-button" data-removal-decline="${r.id}">Decline</button>
+          <button type="button" class="primary-button" data-removal-approve="${r.id}">Approve</button>
+        </div>`;
+      }).join("")}
+    </section>` : "";
+
+  const cards = people.length ? people.map(person => `
+    <article class="person-card ${person.active ? "" : "person-inactive"}">
+      <div class="person-avatar" style="background:${esc(person.color || "#789a80")}">${esc(person.name.slice(0,1).toUpperCase())}</div>
+      <h3>${esc(person.name)}</h3>
+      <p>${esc(person.role)} · ${person.accountId ? "Account linked" : "Member profile"} · ${person.active ? "Active" : "Inactive"}</p>
+      <div class="person-actions">
+        ${admin ? `<button type="button" class="secondary-button" data-profile-toggle="${person.id}" data-next-active="${person.active ? "false" : "true"}">${person.active ? "Deactivate" : "Reactivate"}</button>` : ""}
+        ${manager && person.active ? `<button type="button" class="secondary-button" data-profile-request="${person.id}">Request removal</button>` : ""}
+      </div>
+    </article>`).join("") : empty("Start with your people.", "Add member profiles now. Accounts and invitations can be linked later.");
+
+  $("peopleGrid").innerHTML = requestPanel + cards;
 }
 function renderLedger() {
   const entries=Cloud.getActivity();
@@ -332,7 +369,7 @@ document.addEventListener("click", event => {
 
 function esc(s="") { return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function populatePeopleSelects() {
-  const people=Cloud.getState().people;
+  const people=Cloud.getState().people.filter(p => p.active !== false);
   $("taskAssigneeOptions").innerHTML=people.length?people.map(p=>`<label class="assignee-option"><input type="checkbox" value="${p.id}" data-assignee-option> <span>${esc(p.name)}</span></label>`).join(""):empty("No household profiles yet","An Admin or authorized Manager can add people first.");
   $("awayPerson").innerHTML=`<option value="">Select a person</option>`+people.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("");
 }
@@ -507,6 +544,42 @@ function setup() {
   document.querySelectorAll("[data-task-filter]").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.taskFilter;document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x===b));renderTasks();});
   document.querySelectorAll("[data-summary-filter]").forEach(card=>{card.setAttribute("role","button");card.setAttribute("tabindex","0");card.setAttribute("aria-label","Show "+card.dataset.summaryFilter+" tasks");const activate=()=>{taskFilter=card.dataset.summaryFilter;setView("tasks");document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x.dataset.taskFilter===taskFilter));renderTasks();};card.addEventListener("click",activate);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate();}});});
   $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
+  $("peopleGrid").addEventListener("click", async event => {
+    const toggle = event.target.closest("[data-profile-toggle]");
+    const request = event.target.closest("[data-profile-request]");
+    const approve = event.target.closest("[data-removal-approve]");
+    const decline = event.target.closest("[data-removal-decline]");
+    try {
+      if (toggle) {
+        const active = toggle.dataset.nextActive === "true";
+        const person = Cloud.getState().people.find(p => p.id === toggle.dataset.profileToggle);
+        const accepted = await askWIWYConfirm(active ? "Reactivate household member?" : "Deactivate household member?",
+          active ? `Restore ${person?.name || "this person"} to active household lists? Previous task assignments will not be restored automatically.`
+                 : `${person?.name || "This person"} will be removed from active assignment lists. Unfinished assignments will be cleared; historical records will remain.`,
+          active ? "Reactivate" : "Deactivate");
+        if (!accepted) return;
+        await Cloud.setProfileActive(toggle.dataset.profileToggle, active);
+        populatePeopleSelects(); render();
+        toast(active ? "Household member reactivated." : "Household member deactivated. History preserved.");
+      } else if (request) {
+        const person = Cloud.getState().people.find(p => p.id === request.dataset.profileRequest);
+        if (!await askWIWYConfirm("Request profile removal?", `Send the household Admin a request to deactivate ${person?.name || "this person"}?`, "Send request")) return;
+        await Cloud.requestProfileRemoval(request.dataset.profileRequest);
+        render(); toast("Removal request sent to the household Admin.");
+      } else if (approve || decline) {
+        const button = approve || decline;
+        const accept = !!approve;
+        if (!await askWIWYConfirm(accept ? "Approve removal request?" : "Decline removal request?",
+          accept ? "This will deactivate the profile and clear unfinished assignments. Historical records will remain." : "This request will be declined. The person's profile will remain active.",
+          accept ? "Approve and deactivate" : "Decline request")) return;
+        await Cloud.reviewProfileRemoval(button.dataset.removalApprove || button.dataset.removalDecline, accept);
+        populatePeopleSelects(); render();
+        toast(accept ? "Request approved. Profile deactivated." : "Removal request declined.");
+      }
+    } catch (error) {
+      toast("People update failed: " + error.message);
+    }
+  });
   $("closePersonEditor").onclick=(event)=>{event.preventDefault();$("personDialog").close();};
   $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(name){const errorBox=$("personFormError");errorBox.hidden=true;errorBox.textContent="";try{await Cloud.addPerson({name,color:$("personColor").value});$("personDialog").close();populatePeopleSelects();render();toast("✓ Household member added.");}catch(error){errorBox.textContent="Could not add person: "+error.message;errorBox.hidden=false;}}});
   $("addMealButton").onclick=()=>{$("mealEditor").reset();$("mealDialog").showModal();};
