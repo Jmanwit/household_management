@@ -293,3 +293,22 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 .push-setup-copy { color: var(--muted, #817a6c); margin: 0 0 10px; font-size: .92rem; line-height: 1.5; }
 .push-enable-button { margin: 0 0 18px; }
 .push-enable-button:disabled { opacity: .65; cursor: wait; }
+
+
+/* WIWY 0.9.0 — identity, profile administration, and top-layer feedback */
+.brand-mark{overflow:hidden;padding:0;display:grid;place-items:center;background:#123d29;border-color:#9b865d}
+.brand-mark img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.person-avatar{color:#fff!important;-webkit-text-stroke:1.35px #000;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;paint-order:stroke fill}
+.person-inactive{opacity:.66;border-style:dashed}
+.person-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.member-requests{grid-column:1/-1;margin-top:18px}
+.member-requests .panel-heading{margin-bottom:6px}
+.member-requests .panel-heading h3{font:500 21px Georgia,serif;margin:2px 0}
+.request-row{display:flex;align-items:center;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
+.request-row>span{flex:1;min-width:0}.request-row small{display:block;color:var(--muted);font-size:11px}
+.page-back{width:42px;height:42px;padding:8px;display:grid;place-items:center}
+.page-back svg,.calendar-back svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.calendar-back{display:inline-flex;align-items:center;gap:5px}
+.toast{position:fixed;inset:auto auto calc(22px + env(safe-area-inset-bottom)) 50%;margin:0;max-width:min(92vw,560px);width:max-content;transform:translate(-50%,18px);opacity:0;pointer-events:none;z-index:2147483647;box-shadow:0 12px 40px #0009;transition:opacity .16s,transform .16s}
+.toast:popover-open{display:block;opacity:1;transform:translate(-50%,0);pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
