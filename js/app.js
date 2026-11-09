@@ -315,6 +315,21 @@ async function enablePushNotifications() {
   }
 }
 
+
+// Capture push-button taps at the document level rather than relying on a
+// direct onclick property. This listener is installed before authenticated
+// startup, so unrelated setup/rendering code cannot prevent the button binding.
+document.addEventListener("click", event => {
+  const button = event.target.closest("#enablePushButton");
+  if (!button) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  button.textContent = "Starting push setup…";
+  button.disabled = true;
+  // The registration function owns subsequent progress, errors, and re-enabling.
+  enablePushNotifications();
+}, true);
+
 function esc(s="") { return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function populatePeopleSelects() {
   const people=Cloud.getState().people;
@@ -536,7 +551,6 @@ function setup() {
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSidebar(); });
   $("workspaceButton").onclick=()=>toast("Workspace switching will be added with account and invitation support.");
   $("notificationButton").onclick=()=>{renderNotificationCenter();$("notificationDialog").showModal();};
-  $("enablePushButton").onclick=enablePushNotifications;
   $("closeNotifications").onclick=()=>$("notificationDialog").close();
   $("notificationCenterContent").addEventListener("click",async e=>{
     const button=e.target.closest("[data-notification-read]");
