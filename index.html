@@ -7,14 +7,14 @@
   <meta name="description" content="Wherever I'm With You — a shared home and life organizer.">
   <title>WIWY · Wherever I'm With You</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="brand-mark">W</div>
+        <div class="brand-mark"><img src="./icons/wiwy-emblem.png" alt="WIWY house emblem"></div>
         <div><div class="brand-name">WIWY</div><div class="brand-subtitle">Wherever I'm With You</div></div>
       </div>
       <div class="workspace-switch">
@@ -39,7 +39,7 @@
 
     <main class="main-content">
       <header class="topbar">
-        <button class="page-back" id="pageBack" aria-label="Go back" title="Back" hidden>←</button><button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
+        <button class="page-back" id="pageBack" aria-label="Go back" title="Back" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M29 7 11 24l18 17M12 24h25"/></svg></button><button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
         <div><div class="eyebrow" id="dateLabel">YOUR HOUSEHOLD</div><h1 id="pageTitle">Today</h1></div>
         <div class="top-actions">
           <button class="icon-button" id="awayButton" title="Away mode synchronization is coming later" disabled>☼ <span class="desktop-only">Away mode</span></button>
@@ -82,7 +82,7 @@
 
       <section class="view" id="view-calendar">
         <div class="view-toolbar"><div><p class="muted">Choose a date to see the household schedule.</p></div><div class="calendar-view-controls"><div class="segmented"><button class="selected" data-cal-mode="day">Day</button><button data-cal-mode="week">Week</button><button data-cal-mode="month">Month</button></div><button class="secondary-button" id="calendarToday">Today</button></div></div>
-        <div class="panel calendar-panel"><div class="calendar-header"><button class="icon-button" id="prevDay" aria-label="Previous period">‹</button><div class="calendar-heading-center"><button class="secondary-button" id="calendarReturnMonth" hidden>← Month</button><h3 id="calendarDate">Today</h3></div><button class="icon-button" id="nextDay" aria-label="Next period">›</button></div><div id="calendarGrid" class="calendar-grid"></div></div>
+        <div class="panel calendar-panel"><div class="calendar-header"><button class="icon-button" id="prevDay" aria-label="Previous period">‹</button><div class="calendar-heading-center"><button class="secondary-button calendar-back" id="calendarReturnMonth" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M29 7 11 24l18 17M12 24h25"/></svg> Month</button><h3 id="calendarDate">Today</h3></div><button class="icon-button" id="nextDay" aria-label="Next period">›</button></div><div id="calendarGrid" class="calendar-grid"></div></div>
       </section>
 
       <section class="view" id="view-tasks">
@@ -180,7 +180,7 @@
 
   <section id="authGate" class="auth-gate" hidden>
     <div class="auth-card">
-      <div class="brand auth-brand"><div class="brand-mark">W</div><div><div class="brand-name">WIWY</div><div class="brand-subtitle">Wherever I'm With You</div></div></div>
+      <div class="brand auth-brand"><div class="brand-mark"><img src="./icons/wiwy-emblem.png" alt="WIWY house emblem"></div><div><div class="brand-name">WIWY</div><div class="brand-subtitle">Wherever I'm With You</div></div></div>
       <span class="eyebrow">YOUR PRIVATE WORKSPACE</span>
       <h1>Welcome home.</h1>
       <p class="auth-intro">Sign in or create your administrator account to set up your WIWY workspace.</p>
@@ -192,7 +192,7 @@
     </div>
   </section>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" popover="manual" role="status" aria-live="polite"></div>
   <script type="module" src="./js/app.js"></script>
 
   <dialog id="taskDetailDialog" class="modal task-detail-modal">
