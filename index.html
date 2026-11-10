@@ -40,11 +40,11 @@
     <main class="main-content">
       <header class="topbar">
         <button class="page-back" id="pageBack" aria-label="Go back" title="Back" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M29 7 11 24l18 17M12 24h25"/></svg></button><button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
-        <div><div class="eyebrow" id="dateLabel">YOUR HOUSEHOLD</div><h1 id="pageTitle">Today</h1></div>
+        <div class="header-identity"><div class="header-brand"><img src="./icons/wiwy-emblem.png" alt=""><span><strong>WIWY</strong><small>Wherever I'm With You</small></span></div><div class="page-heading"><div class="eyebrow date-stack" id="dateLabel"><span>YOUR HOUSEHOLD</span></div><h1 id="pageTitle">Today</h1></div></div>
         <div class="top-actions">
-          <button class="icon-button" id="awayButton" title="Away mode synchronization is coming later" disabled>☼ <span class="desktop-only">Away mode</span></button>
+          <button class="icon-button" id="awayButton" title="Away mode"><img src="./icons/away-suitcase.svg" alt="" class="away-suitcase-icon"> <span class="desktop-only">Away mode</span></button>
           <button type="button" class="icon-button notification-button" id="notificationButton" title="Notifications" aria-label="Notifications"><svg class="notification-bell" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i></i></button>
-          <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false">♙</button>
+          <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.7-4 3.2-6 7.5-6s6.8 2 7.5 6"/></svg></button>
           <div id="accountMenu" class="account-menu" hidden>
             <div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div>
             <button type="button" data-account-action="account">Account settings</button>
@@ -74,7 +74,7 @@
             <div class="panel-heading"><div><span class="eyebrow">AT A GLANCE</span><h3>Household</h3></div></div>
             <div id="householdMini" class="people-mini"></div>
             <div class="panel-divider"></div>
-            <div class="panel-heading compact"><div><span class="eyebrow">DINNER</span><h3>On the menu</h3></div><button class="text-button" data-go="meals">Edit</button></div>
+            <div class="panel-heading compact"><div><span class="eyebrow">DINNER</span><h3><button type="button" class="heading-link" data-go="meals">On the menu</button></h3></div><button class="text-button" data-go="meals">Edit</button></div>
             <div id="dinnerPreview" class="dinner-preview"><div class="empty-icon">♨</div><p>No dinner planned yet.</p></div>
           </section>
         </div>
@@ -92,14 +92,14 @@
       </section>
 
       <section class="view" id="view-meals">
-        <div class="view-toolbar"><p class="muted">Plan the food, prep, and shared moments around the table.</p><button class="primary-button" id="addMealButton" disabled>＋ <span>Add meal</span></button></div><p class="sync-note">Meal-plan synchronization is coming in a later update. Editing is temporarily paused so devices do not develop conflicting copies.</p>
-        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">THIS WEEK</span><h3>Meal plan</h3></div></div><div id="mealList" class="meal-list"></div></div>
+        <div class="view-toolbar"><p class="muted">Plan breakfast, lunch, dinner, and the preparation that brings them together.</p><button class="primary-button" id="addMealButton">＋ <span>Add meal</span></button></div>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">HOUSEHOLD MEAL PLAN</span><h3>Upcoming meals</h3></div></div><div id="mealList" class="meal-list"></div></div>
       </section>
 
       <section class="view" id="view-groceries">
-        <div class="view-toolbar"><p class="muted">One shared list. Fewer forgotten things.</p></div>
-        <p class="sync-note">Grocery-list synchronization is coming in a later update. Editing is temporarily paused so everyone sees one consistent list.</p><form id="groceryForm" class="add-inline"><input id="groceryInput" placeholder="Grocery sync coming soon" disabled autocomplete="off"><select id="groceryCategory" disabled><option>General</option><option>Produce</option><option>Meat & seafood</option><option>Dairy</option><option>Pantry</option><option>Household</option></select><button class="primary-button" disabled>Add</button></form>
-        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">SHOPPING LIST</span><h3 id="groceryHeading">Items to pick up</h3></div><button class="text-button" id="clearGroceries" disabled>Clear completed</button></div><div id="groceryList" class="grocery-list"></div></div>
+        <div class="view-toolbar"><p class="muted">One shared list. Add quantities and notes when they help.</p></div>
+        <form id="groceryForm" class="grocery-entry"><label>Item<input id="groceryInput" placeholder="e.g. Whole milk" required autocomplete="off"></label><label>Quantity<input id="groceryQuantity" placeholder="e.g. 2 gallons" value="1"></label><label>Category<select id="groceryCategory"><option>General</option><option>Produce</option><option>Meat & seafood</option><option>Dairy</option><option>Pantry</option><option>Household</option></select></label><label>Notes<input id="groceryNotes" placeholder="Optional details"></label><button class="primary-button" type="submit">Add item</button></form>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">SHOPPING LIST</span><h3 id="groceryHeading">Items to pick up</h3></div><button class="text-button" id="clearGroceries">Clear completed</button></div><div id="groceryList" class="grocery-list"></div></div>
       </section>
 
       <section class="view" id="view-people">
@@ -116,7 +116,7 @@
         <div class="settings-grid">
           <div class="panel settings-card"><span class="eyebrow">WORKSPACE</span><h3>Workspace settings</h3><label>Workspace name<input id="settingsWorkspace" value="Our Home"></label><button class="primary-button" id="saveWorkspace">Save name</button></div>
           <div class="panel settings-card"><span class="eyebrow">DATA</span><h3>Backup & restore</h3><p class="muted">Export a copy of your workspace data or restore from a previous export.</p><div class="button-row"><button class="secondary-button" id="exportData">Export JSON</button><label class="file-button">Import JSON<input type="file" id="importData" accept="application/json"></label></div></div>
-          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Early access foundation 0.1.0</div></div>
+          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Version 0.9.1</div></div>
         </div>
       </section>
 
@@ -169,12 +169,16 @@
     <form method="dialog" id="personEditor"><div class="modal-head"><div><span class="eyebrow">WORKSPACE MEMBER</span><h2>Add a person</h2></div><button type="button" class="close-button" id="closePersonEditor" aria-label="Close">×</button></div><div id="personFormError" class="form-error" role="alert" hidden></div><label>Name<input id="personName" required></label><label>Visual identity color<input type="color" id="personColor" value="#6e927d"></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Add person</button></div></form>
   </dialog>
 
-  <dialog id="mealDialog" class="modal small-modal">
-    <form method="dialog" id="mealEditor"><div class="modal-head"><div><span class="eyebrow">MEAL PLAN</span><h2>Add a meal</h2></div><button class="close-button" value="cancel">×</button></div><label>Day<select id="mealDay"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></label><label>Meal<input id="mealName" required placeholder="e.g. Roast chicken and potatoes"></label><label>Prep notes<textarea id="mealNotes" rows="2"></textarea></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Save meal</button></div></form>
+  <dialog id="groceryEditDialog" class="modal small-modal">
+    <form id="groceryEditForm"><div class="modal-head"><div><span class="eyebrow">SHOPPING LIST</span><h2>Edit item</h2></div><button type="button" class="close-button" id="closeGroceryEdit" aria-label="Close">×</button></div><input type="hidden" id="groceryEditId"><label>Item<input id="groceryEditName" required></label><div class="form-row"><label>Quantity<input id="groceryEditQuantity"></label><label>Category<select id="groceryEditCategory"><option>General</option><option>Produce</option><option>Meat & seafood</option><option>Dairy</option><option>Pantry</option><option>Household</option></select></label></div><label>Notes<input id="groceryEditNotes"></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelGroceryEdit">Cancel</button><span></span><button type="submit" class="primary-button">Save changes</button></div></form>
+  </dialog>
+
+  <dialog id="mealDialog" class="modal meal-modal">
+    <form id="mealEditor"><div class="modal-head"><div><span class="eyebrow">MEAL PLAN</span><h2 id="mealDialogTitle">Add a meal</h2></div><button type="button" class="close-button" id="closeMealEditor" aria-label="Close">×</button></div><input type="hidden" id="mealId"><div class="form-row"><label>Date<input id="mealDate" type="date" required></label><label>Meal type<select id="mealType"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select></label></div><label>Meal<input id="mealName" required maxlength="120" placeholder="e.g. Butter chicken"></label><label>Prep notes<textarea id="mealNotes" rows="2"></textarea></label><section class="meal-task-builder"><div class="panel-heading"><div><span class="eyebrow">PREPARATION & REMINDERS</span><h3>Tasks for this meal</h3></div><button type="button" class="secondary-button" id="addMealTask">＋ Add task</button></div><p class="muted small-note">These are normal WIWY tasks. They will appear in the task list and use the usual reminder system.</p><div id="mealTaskRows"></div><div id="existingMealTasks" class="existing-meal-tasks"></div></section><div class="modal-actions"><button type="button" class="secondary-button" id="cancelMealEditor">Cancel</button><span></span><button class="primary-button" type="submit">Save meal</button></div></form>
   </dialog>
 
   <dialog id="awayDialog" class="modal small-modal">
-    <form method="dialog" id="awayEditor"><div class="modal-head"><div><span class="eyebrow">FLEXIBLE BY DESIGN</span><h2>Away mode</h2></div><button class="close-button" value="cancel">×</button></div><p class="muted">Pause routine reminders without completing or deleting tasks. Your schedule and history stay intact.</p><div id="awayStatus" class="away-status" aria-live="polite">Away Mode is currently off.</div><label>Apply to<select id="awayScope"><option value="workspace">Everyone in this workspace</option><option value="person">One person</option></select></label><label id="awayPersonWrap" hidden>Person<select id="awayPerson"></select></label><label>Resume<select id="awayDuration"><option value="tomorrow">Tomorrow at 5:00 AM</option><option value="indefinite">Manually turn off</option></select></label><div class="modal-actions"><span></span><button class="primary-button" value="save">Enable away mode</button></div></form>
+    <form method="dialog" id="awayEditor"><div class="modal-head"><div><span class="eyebrow">FLEXIBLE BY DESIGN</span><h2>Away mode</h2></div><button type="button" class="close-button" id="closeAwayDialog" aria-label="Close">×</button></div><p class="muted">Pause routine reminders without completing or deleting tasks. Your schedule and history stay intact.</p><div id="awayStatus" class="away-status" aria-live="polite">Away Mode is currently off.</div><label>Apply to<select id="awayScope"><option value="workspace">Everyone in this workspace</option><option value="person">One person</option></select></label><label id="awayPersonWrap" hidden>Person<select id="awayPerson"></select></label><label>Resume<select id="awayDuration"><option value="tomorrow">Tomorrow at 5:00 AM</option><option value="indefinite">Manually turn off</option></select></label><div class="modal-actions"><span></span><button type="submit" class="primary-button" id="enableAwayModeButton" value="save">Enable away mode</button></div></form>
   </dialog>
 
 

@@ -1,9 +1,9 @@
-const CACHE = "wiwy-shell-v16";
+const CACHE = "wiwy-shell-v17";
 // Only required application files belong in the install-critical list.
 // The manifest and artwork are optional; a missing icon must never prevent
 // the service worker from activating (which would leave push setup hanging).
 const CORE = ["./", "./index.html", "./css/app.css", "./js/app.js", "./js/cloud.js"];
-const OPTIONAL = ["./manifest.webmanifest", "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/wiwy-emblem.png"];
+const OPTIONAL = ["./manifest.webmanifest", "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/wiwy-emblem.png", "./icons/away-suitcase.svg"];
 self.addEventListener("install", event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
   await cache.addAll(CORE);
