@@ -1,4 +1,4 @@
-const CACHE = "wiwy-shell-v18";
+const CACHE = "wiwy-shell-v19";
 // Only required application files belong in the install-critical list.
 // The manifest and artwork are optional; a missing icon must never prevent
 // the service worker from activating (which would leave push setup hanging).

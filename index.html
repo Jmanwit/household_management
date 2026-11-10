@@ -40,7 +40,7 @@
     <main class="main-content">
       <header class="topbar">
         <div class="header-brand-row" aria-label="Wherever I'm With You">
-          <img src="./icons/wiwy-emblem.png" alt="WIWY house emblem">
+          <img src="./icons/wiwy-emblem.png" alt="House emblem">
           <span>Wherever I'm With You</span>
         </div>
         <div class="header-controls-row">
@@ -48,20 +48,12 @@
             <button class="page-back" id="pageBack" aria-label="Go back" title="Back" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M29 7 11 24l18 17M12 24h25"/></svg></button>
             <button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
           </div>
-          <div class="page-heading">
-            <div class="eyebrow date-stack" id="dateLabel"><span>MONDAY</span><span>MONTH 9</span></div>
-            <h1 id="pageTitle">Today</h1>
-          </div>
+          <div class="page-heading"><div class="eyebrow date-stack" id="dateLabel"><span>YOUR HOUSEHOLD</span></div><h1 id="pageTitle">Today</h1></div>
           <div class="top-actions">
             <button class="icon-button" id="awayButton" title="Away mode" aria-label="Away mode"><img src="./icons/away-suitcase.svg" alt="" class="away-suitcase-icon"></button>
             <button type="button" class="icon-button notification-button" id="notificationButton" title="Notifications" aria-label="Notifications"><svg class="notification-bell" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i></i></button>
             <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.7-4 3.2-6 7.5-6s6.8 2 7.5 6"/></svg></button>
-            <div id="accountMenu" class="account-menu" hidden>
-              <div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div>
-              <button type="button" data-account-action="account">Account settings</button>
-              <button type="button" data-account-action="household">Household settings</button>
-              <button type="button" data-account-action="signout">Sign out</button>
-            </div>
+            <div id="accountMenu" class="account-menu" hidden><div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div><button type="button" data-account-action="account">Account settings</button><button type="button" data-account-action="household">Household settings</button><button type="button" data-account-action="signout">Sign out</button></div>
           </div>
         </div>
       </header>
@@ -83,7 +75,7 @@
             <div id="todayAgenda" class="agenda-list"></div>
           </section>
           <section class="panel side-panel">
-            <div class="panel-heading"><div><span class="eyebrow">AT A GLANCE</span><h3>Household</h3></div></div>
+            <div class="panel-heading"><div><span class="eyebrow">AT A GLANCE</span><h3><button type="button" class="heading-link" data-go="people">Household</button></h3></div></div>
             <div id="householdMini" class="people-mini"></div>
             <div class="panel-divider"></div>
             <div class="panel-heading compact"><div><span class="eyebrow">DINNER</span><h3><button type="button" class="heading-link" data-go="meals">On the menu</button></h3></div><button class="text-button" data-go="meals">Edit</button></div>
