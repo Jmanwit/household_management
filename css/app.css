@@ -312,3 +312,49 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 .toast{position:fixed;inset:auto auto calc(22px + env(safe-area-inset-bottom)) 50%;margin:0;max-width:min(92vw,560px);width:max-content;transform:translate(-50%,18px);opacity:0;pointer-events:none;z-index:2147483647;box-shadow:0 12px 40px #0009;transition:opacity .16s,transform .16s}
 .toast:popover-open{display:block;opacity:1;transform:translate(-50%,0);pointer-events:none}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* WIWY 0.9.1 — household, meals, shopping and header refinements */
+.header-identity{display:flex;align-items:center;gap:22px;min-width:0}
+.header-brand{display:flex;align-items:center;gap:9px;padding-right:18px;border-right:1px solid var(--line);white-space:nowrap}
+.header-brand img{width:38px;height:38px;object-fit:contain}
+.header-brand span{display:grid;line-height:1.2}
+.header-brand strong{font-size:12px;letter-spacing:.16em}
+.header-brand small{font-size:9px;color:var(--muted)}
+.page-heading{min-width:0}
+.date-stack{display:flex;flex-direction:column;gap:0;line-height:1.2;letter-spacing:.11em}
+.date-stack span{display:block}
+.page-back{width:39px;height:39px;min-width:39px;min-height:39px;flex:0 0 39px;padding:8px;margin:0}
+.page-back svg{width:20px;height:20px;stroke-width:2.7}
+.avatar svg{width:21px;height:21px;fill:none;stroke:#f3f4ef;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.away-suitcase-icon{width:20px;height:20px;object-fit:contain;vertical-align:middle}
+.heading-link{border:0;background:transparent;color:inherit;padding:0;font:inherit;cursor:pointer}
+.heading-link:hover{color:var(--green)}
+.meal-row-card{grid-template-columns:92px minmax(0,1fr) auto;align-items:start}
+.meal-day{display:grid;gap:3px}
+.meal-day small{font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:.1em}
+.meal-actions{display:flex;gap:5px}
+.meal-actions .task-edit{padding:4px 8px}
+.meal-linked-tasks{display:grid;gap:3px;margin-top:8px}
+.meal-linked-tasks span,.existing-meal-task{font-size:11px;color:#b7c4b9}
+.meal-modal{width:min(94vw,680px)}
+.meal-task-builder{border:1px solid var(--line);border-radius:13px;padding:14px;margin-top:16px;background:#171e19}
+.meal-task-builder .panel-heading{margin-bottom:6px}
+.meal-task-builder .panel-heading h3{font-size:18px}
+.meal-task-draft{border-top:1px solid var(--line);padding:13px 0;display:grid;gap:10px}
+.meal-task-draft .form-row{grid-template-columns:1.2fr 1fr .8fr}
+.meal-task-draft .text-button{justify-self:start;padding:3px 0}
+.existing-meal-tasks{display:grid;gap:6px;margin-top:8px}
+.small-note{font-size:11px}
+.grocery-entry{display:grid;grid-template-columns:1.2fr .7fr .8fr 1.2fr auto;gap:9px;align-items:end;margin:18px 0}
+.grocery-entry label{display:grid;gap:5px;font-size:10px;color:#b9c4bb;font-weight:700}
+.grocery-entry button{white-space:nowrap}
+.grocery-row label{display:grid;gap:2px}
+.grocery-row label small{font-size:10px;color:var(--muted);font-weight:400}
+.danger-button{border-color:#70423d;color:#e3a49b}
+.danger-button:hover{background:#492b28}
+.delete-access-choice{display:flex!important;align-items:center;gap:9px;margin-top:15px;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--surface2);font-size:12px!important}
+.delete-access-choice input{width:17px;height:17px}
+@media(max-width:900px){.header-brand{display:flex;gap:6px;padding-right:9px}.header-brand img{width:30px;height:30px}.header-brand small{display:none}.header-brand strong{font-size:10px}.header-identity{gap:9px}.grocery-entry{grid-template-columns:1fr 1fr}.grocery-entry button{grid-column:1/-1}}
+@media(max-width:560px){.meal-task-draft .form-row{grid-template-columns:1fr 1fr}.meal-task-draft .form-row label:first-child{grid-column:1/-1}.meal-row-card{grid-template-columns:70px minmax(0,1fr) auto;gap:9px}.grocery-entry{grid-template-columns:1fr 1fr}}
+
+.person-avatar{color:#fff!important;-webkit-text-stroke:.55px #111; text-shadow:0 1px 1px #111,1px 0 1px #111}
