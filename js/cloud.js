@@ -3,7 +3,7 @@ let client = null;
 let workspace = null;
 let membership = null;
 let user = null;
-let state = { people: [], tasks: [] };
+let state = { people: [], tasks: [], meals: [], groceries: [] };
 let activity = [];
 let awayPeriods = [];
 let notifications = [];
@@ -36,7 +36,7 @@ const mapTask = (row, ops, assignments, occurrences, completions) => {
     completedByProfileId:o.completed_by_profile_id
   }]));
   return {
-    id: row.id, name: row.name, assigneeId: assigneeIds[0] || row.assignee_profile_id || null,
+    id: row.id, name: row.name, linkedMealId: row.linked_meal_id || null, assigneeId: assigneeIds[0] || row.assignee_profile_id || null,
     assigneeIds, repeat: r.type || "once", weekdays: r.weekdays || [],
     date: r.date || null, start: row.start_time || null, end: row.end_time || null,
     notes: row.notes || "", archived: Boolean(row.archived_at),
@@ -115,6 +115,8 @@ export async function initialize(authClient, activeWorkspace, activeMembership, 
   if (channel) client.removeChannel(channel);
   channel = client.channel(`wiwy-workspace-${workspace.id}`)
     .on("postgres_changes", { event:"*", schema:"public", table:"tasks", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"meals", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"grocery_items", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"member_profiles", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"profile_removal_requests", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"task_occurrences", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
@@ -143,13 +145,16 @@ export async function refresh() {
     const requestQuery = (membership?.role === "Admin" || membership?.role === "Manager")
       ? client.from("profile_removal_requests").select("id,workspace_id,profile_id,requested_by,status,requested_at,reviewed_by,reviewed_at,review_note").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", {ascending:true})
       : Promise.resolve({ data: [], error: null });
-    const [peopleRes, taskRes, activityRes, awayRes, notificationRes, requestRes] = await Promise.all([
+    const [peopleRes, taskRes, activityRes, awayRes, notificationRes, requestRes, mealsRes, groceriesRes, membershipsRes] = await Promise.all([
       client.from("member_profiles").select("id,workspace_id,display_name,color,is_active,created_at").eq("workspace_id", workspace.id).order("created_at"),
-      client.from("tasks").select("id,workspace_id,name,assignee_profile_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at,advance_reminder_offsets,completion_push_enabled").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
+      client.from("tasks").select("id,workspace_id,name,assignee_profile_id,linked_meal_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at,advance_reminder_offsets,completion_push_enabled").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
       client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
       client.from("away_periods").select("id,workspace_id,member_profile_id,starts_at,ends_at,is_active,created_by").eq("workspace_id", workspace.id).eq("is_active", true).order("starts_at", {ascending:false}),
       client.from("notifications").select("id,notification_type,title,body,task_id,occurrence_id,occurrence_date,push_requested,created_at,read_at,event_key").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
-      requestQuery
+      requestQuery,
+      client.from("meals").select("id,workspace_id,meal_date,meal_type,name,notes,recipe,created_by,created_at").eq("workspace_id", workspace.id).order("meal_date"),
+      client.from("grocery_items").select("id,workspace_id,name,category,quantity,notes,is_completed,linked_meal_id,added_by,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:true}),
+      client.from("workspace_memberships").select("member_profile_id,user_id,role").eq("workspace_id", workspace.id)
     ]);
     if (peopleRes.error) throw peopleRes.error;
     if (taskRes.error) throw taskRes.error;
@@ -157,6 +162,9 @@ export async function refresh() {
     if (awayRes.error) throw awayRes.error;
     if (notificationRes.error) throw notificationRes.error;
     if (requestRes.error) throw requestRes.error;
+    if (mealsRes.error) throw mealsRes.error;
+    if (groceriesRes.error) throw groceriesRes.error;
+    if (membershipsRes.error) throw membershipsRes.error;
     notifications = notificationRes.data || [];
     removalRequests = requestRes.data || [];
 
@@ -164,7 +172,7 @@ export async function refresh() {
     const profileNames = new Map((peopleRes.data || []).map(p => [p.id,p.display_name]));
     activity = (activityRes.data || []).map(row => ({
       ...row,
-      actorName: row.actor_profile_id ? (profileNames.get(row.actor_profile_id) || "Household member") : "Household member"
+      actorName: row.detail?.actor_display_name || (row.actor_profile_id ? (profileNames.get(row.actor_profile_id) || "Household member") : "Household member")
     }));
     const taskRows = taskRes.data || [];
     const activeToday = taskRows.filter(t => !t.archived_at && dateOccurs(t, todayKey()));
@@ -195,9 +203,12 @@ export async function refresh() {
         completions = completionRes.data || [];
       }
     }
+    const linkedByProfile = new Map((membershipsRes.data || []).filter(m=>m.member_profile_id).map(m=>[m.member_profile_id,m]));
     state = {
-      people: (peopleRes.data || []).map(p => ({id:p.id,name:p.display_name,color:p.color,active:p.is_active !== false,role:"Household member",accountId:null})),
-      tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences, completions))
+      people: (peopleRes.data || []).map(p => { const linked=linkedByProfile.get(p.id); return {id:p.id,name:p.display_name,color:p.color,active:p.is_active !== false,role:linked?.role || "Household member",accountRole:linked?.role || null,accountId:linked?.user_id || null}; }),
+      tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences, completions)),
+      meals: (mealsRes.data || []).map(m => ({id:m.id,date:m.meal_date,type:m.meal_type,name:m.name,notes:m.notes || "",recipe:m.recipe || {},createdAt:m.created_at})),
+      groceries: (groceriesRes.data || []).map(g => ({id:g.id,name:g.name,category:g.category,quantity:g.quantity || "",notes:g.notes || "",done:!!g.is_completed,linkedMealId:g.linked_meal_id || null,createdAt:g.created_at}))
     };
     return getState();
   } finally { refreshBusy = false; }
@@ -237,12 +248,67 @@ export async function addPerson(person) {
   await refresh();
   return data;
 }
+export async function saveMeal(meal) {
+  if (!meal.name?.trim()) throw new Error("A meal name is required.");
+  const payload = {workspace_id:workspace.id,meal_date:meal.date,meal_type:meal.type,name:meal.name.trim(),notes:meal.notes || ""};
+  const result = meal.id
+    ? await client.from("meals").update(payload).eq("id",meal.id).select("id").single()
+    : await client.from("meals").insert({...payload,recipe:{},created_by:user?.id || null}).select("id").single();
+  if (result.error) throw result.error;
+  await recordActivity(meal.id ? "Updated a meal" : "Added a meal", "meal", result.data.id, {meal_name:meal.name.trim()});
+  await refresh();
+  return result.data.id;
+}
+export async function deleteMeal(id) {
+  const {error}=await client.from("meals").delete().eq("id",id).eq("workspace_id",workspace.id);
+  if(error) throw error;
+  await recordActivity("Removed a meal", "meal", id, {});
+  await refresh();
+}
+export async function saveGrocery(item) {
+  if(!item.name?.trim()) throw new Error("Enter an item name.");
+  const payload={workspace_id:workspace.id,name:item.name.trim(),category:item.category||"General",quantity:item.quantity?.trim()||"1",notes:item.notes?.trim()||"",is_completed:false,added_by:user?.id||null};
+  const {error}=await client.from("grocery_items").insert(payload);
+  if(error) throw error;
+  await recordActivity("Added a shopping item","grocery_item",null,{name:payload.name});
+  await refresh();
+}
+export async function updateGrocery(id,item) {
+  if(!item.name?.trim()) throw new Error("Enter an item name.");
+  const {error}=await client.from("grocery_items").update({name:item.name.trim(),quantity:item.quantity?.trim()||"1",category:item.category||"General",notes:item.notes?.trim()||""}).eq("id",id).eq("workspace_id",workspace.id);
+  if(error) throw error;
+  await refresh();
+}
+export async function toggleGrocery(id,completed) {
+  const {error}=await client.from("grocery_items").update({is_completed:!!completed}).eq("id",id).eq("workspace_id",workspace.id);
+  if(error) throw error; await refresh();
+}
+export async function deleteGrocery(id) {
+  const {error}=await client.from("grocery_items").delete().eq("id",id).eq("workspace_id",workspace.id);
+  if(error) throw error; await refresh();
+}
+export async function clearCompletedGroceries() {
+  const {error}=await client.from("grocery_items").delete().eq("workspace_id",workspace.id).eq("is_completed",true);
+  if(error) throw error; await refresh();
+}
+export async function permanentlyDeleteProfile(profileId,removeHouseholdAccess=false) {
+  if(!isAdmin()) throw new Error("Only a household Admin can permanently delete a member profile.");
+  const {error}=await client.rpc("wiwy_admin_delete_profile",{target_profile:profileId,p_remove_household_access:!!removeHouseholdAccess});
+  if(error) throw error; await refresh();
+}
+export async function removeHouseholdAccess(profileId) {
+  if(!isAdmin()) throw new Error("Only a household Admin can remove household login access.");
+  const {error}=await client.rpc("wiwy_admin_remove_household_access",{target_profile:profileId});
+  if(error) throw error; await refresh();
+}
+
 function taskPayload(task) {
   const recurrence = task.repeat === "daily" ? {type:"daily"}
     : task.repeat === "weekdays" ? {type:"weekdays",weekdays:task.weekdays || []}
     : {type:"once",date:task.date || todayKey()};
   return {
     workspace_id: workspace.id, name: task.name.trim(),
+    linked_meal_id: task.linkedMealId || null,
     assignee_profile_id: (task.assigneeIds || []).length ? task.assigneeIds[0] : null,
     recurrence, start_time: task.start || null, end_time: task.end || null,
     notes: task.notes || "",
@@ -280,6 +346,7 @@ export async function saveTask(task) {
     if (!membership?.member_profile_id) throw new Error("Your account is not linked to a household profile yet.");
     if (ids.some(id => id !== membership.member_profile_id)) throw new Error("Members can create tasks assigned only to themselves.");
   }
+  let savedTaskId = task.id || null;
   if (task.id) {
     const existing = state.tasks.find(t => t.id === task.id);
     if (!canManageTask(existing)) throw new Error("You can only edit tasks you created. A Manager or Admin can edit other tasks.");
@@ -291,6 +358,7 @@ export async function saveTask(task) {
     const payload = {...taskPayload({...task,assigneeIds:ids}),created_by:user.id};
     const { data, error } = await client.from("tasks").insert(payload).select("id").single();
     if (error) throw error;
+    savedTaskId = data.id;
     try { await replaceChildren(data.id, task, ids); }
     catch (e) {
       await client.from("tasks").delete().eq("id", data.id);
@@ -299,6 +367,7 @@ export async function saveTask(task) {
     await recordActivity("Created a task", "task", data.id, {task_name:task.name});
   }
   await refresh();
+  return savedTaskId;
 }
 export async function deleteTask(id) {
   const task = state.tasks.find(t => t.id === id);
