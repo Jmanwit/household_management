@@ -125,9 +125,9 @@
       <section class="view" id="view-settings">
         <div class="settings-grid">
           <div class="panel settings-card"><span class="eyebrow">WORKSPACE</span><h3>Workspace settings</h3><label>Workspace name<input id="settingsWorkspace" value="Our Home"></label><button class="primary-button" id="saveWorkspace">Save name</button></div>
-          <div class="panel settings-card update-settings-card" id="updateSettingsCard"><span class="eyebrow">APPLICATION</span><h3>Application updates</h3><p class="muted">WIWY checks for new versions in the background. Installation only happens when you choose it.</p><div class="version" id="installedVersion">Installed version: 0.9.6</div><div class="version" id="availableVersion">No update check yet.</div><div class="button-row"><button type="button" class="secondary-button" id="checkForUpdates">Check for updates</button><button type="button" class="primary-button" id="installUpdateButton" hidden>Install update</button></div><p class="muted tiny" id="updateStatus" role="status"></p></div>
+          <div class="panel settings-card update-settings-card" id="updateSettingsCard"><span class="eyebrow">APPLICATION</span><h3>Application updates</h3><p class="muted">WIWY checks for new versions in the background. Installation only happens when you choose it.</p><div class="version" id="installedVersion">Installed version: 0.9.7</div><div class="version" id="availableVersion">No update check yet.</div><div class="button-row"><button type="button" class="secondary-button" id="checkForUpdates">Check for updates</button><button type="button" class="primary-button" id="installUpdateButton" hidden>Install update</button></div><p class="muted tiny" id="updateStatus" role="status"></p></div>
           <div class="panel settings-card"><span class="eyebrow">DATA</span><h3>Cloud backup</h3><p class="muted">Export a complete portable backup or import a WIWY JSON backup into this household. Imports are reviewed before anything is written.</p><div class="button-row"><button class="secondary-button" id="exportData">Export household JSON</button><button class="primary-button" id="importData">Import household JSON</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div>
-          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Version 0.9.6 · Household access & updates</div></div>
+          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Version 0.9.7 · Household access & reliable updates</div></div>
         </div>
       </section>
 
@@ -224,6 +224,21 @@
   <dialog id="taskDetailDialog" class="modal task-detail-modal">
     <div class="modal-head"><div><span class="eyebrow">TASK DETAILS</span><h2 id="taskDetailTitle">Task</h2></div><button class="close-button" id="closeTaskDetail" aria-label="Close">×</button></div>
     <div id="taskDetailContent"></div>
+  </dialog>
+  <dialog id="memberInviteDialog" class="modal small-modal">
+    <form id="memberInviteForm">
+      <div class="modal-head"><div><span class="eyebrow">HOUSEHOLD ACCESS</span><h2>Invite household member</h2></div><button type="button" class="close-button" id="closeMemberInvite" aria-label="Close">×</button></div>
+      <p id="memberInvitePerson" class="muted small-note">Invite this person to your household.</p>
+      <label>Email address<input id="memberInviteEmail" type="email" autocomplete="email" placeholder="name@example.com" required></label>
+      <label>Account role
+        <select id="memberInviteRole" required>
+          <option value="Member" selected>Member — regular household access</option>
+          <option value="Manager">Manager — manages household tasks and operations</option>
+          <option value="Admin">Admin — full household administration</option>
+        </select>
+      </label>
+      <div class="modal-actions"><button type="button" class="secondary-button" id="cancelMemberInvite">Cancel</button><span></span><button type="submit" class="primary-button">Create invitation link</button></div>
+    </form>
   </dialog>
   <dialog id="wiwyConfirmDialog" class="modal confirm-modal">
     <div class="modal-head"><div><span class="eyebrow">PLEASE CONFIRM</span><h2 id="wiwyConfirmTitle">Confirm action</h2></div></div>
