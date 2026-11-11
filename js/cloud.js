@@ -146,7 +146,7 @@ export async function refresh() {
       ? client.from("profile_removal_requests").select("id,workspace_id,profile_id,requested_by,status,requested_at,reviewed_by,reviewed_at,review_note").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", {ascending:true})
       : Promise.resolve({ data: [], error: null });
     const [peopleRes, taskRes, activityRes, awayRes, notificationRes, requestRes, mealsRes, groceriesRes, membershipsRes] = await Promise.all([
-      client.from("member_profiles").select("id,workspace_id,display_name,color,is_active,created_at").eq("workspace_id", workspace.id).order("created_at"),
+      client.from("member_profiles").select("id,workspace_id,display_name,color,birth_date,is_active,created_at").eq("workspace_id", workspace.id).order("created_at"),
       client.from("tasks").select("id,workspace_id,name,assignee_profile_id,linked_meal_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at,advance_reminder_offsets,completion_push_enabled").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
       client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
       client.from("away_periods").select("id,workspace_id,member_profile_id,starts_at,ends_at,is_active,created_by").eq("workspace_id", workspace.id).eq("is_active", true).order("starts_at", {ascending:false}),
@@ -205,7 +205,7 @@ export async function refresh() {
     }
     const linkedByProfile = new Map((membershipsRes.data || []).filter(m=>m.member_profile_id).map(m=>[m.member_profile_id,m]));
     state = {
-      people: (peopleRes.data || []).map(p => { const linked=linkedByProfile.get(p.id); return {id:p.id,name:p.display_name,color:p.color,active:p.is_active !== false,role:linked?.role || "Household member",accountRole:linked?.role || null,accountId:linked?.user_id || null}; }),
+      people: (peopleRes.data || []).map(p => { const linked=linkedByProfile.get(p.id); return {id:p.id,name:p.display_name,color:p.color,birthDate:p.birth_date||null,active:p.is_active !== false,role:linked?.role || "Household member",accountRole:linked?.role || null,accountId:linked?.user_id || null}; }),
       tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences, completions)),
       meals: (mealsRes.data || []).map(m => ({id:m.id,date:m.meal_date,type:m.meal_type,name:m.name,notes:m.notes || "",recipe:m.recipe || {},createdAt:m.created_at})),
       groceries: (groceriesRes.data || []).map(g => ({id:g.id,name:g.name,category:g.category,quantity:g.quantity || "",notes:g.notes || "",done:!!g.is_completed,linkedMealId:g.linked_meal_id || null,createdAt:g.created_at}))

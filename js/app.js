@@ -140,7 +140,7 @@ function renderToday() {
   const state={...Store.getState(), ...Cloud.getState()}, tasks=todayTasks();
   const done=tasks.filter(t=>statusFor(t)==="done").length, progress=tasks.filter(t=>statusFor(t)==="progress").length, late=tasks.filter(t=>statusFor(t)==="late").length;
   $("scheduledCount").textContent=tasks.length; $("completedCount").textContent=done; $("progressCount").textContent=progress; $("notStartedCount").textContent=late;
-  $("dateLabel").innerHTML=`<span>${esc(new Date().toLocaleDateString(undefined,{weekday:"long"}))}</span><span>${esc(new Date().toLocaleDateString(undefined,{month:"long",day:"numeric"}))}</span>`; $("greeting").textContent=new Date().getHours()<12?"Good morning. Here's the shape of the day.":new Date().getHours()<17?"A clear plan for the rest of the day.":"Let's bring the day home.";
+  $("dateLabel").innerHTML=`<span>${esc(new Date().toLocaleDateString(undefined,{weekday:"long"}))}</span><strong>${esc(new Date().toLocaleDateString(undefined,{month:"long",day:"numeric"}))}</strong>`; $("greeting").textContent=new Date().getHours()<12?"Good morning. Here's the shape of the day.":new Date().getHours()<17?"A clear plan for the rest of the day.":"Let's bring the day home.";
   $("todayAgenda").innerHTML=tasks.length?tasks.map(t=>`<button type="button" class="agenda-item agenda-task-button" data-agenda-task="${t.id}"><span class="agenda-time">${timeText(t.start)}</span><div class="agenda-stripe" style="--person-color:${personColor((t.assigneeIds||[])[0])}"></div><div><div class="agenda-name">${esc(t.name)}</div><div class="agenda-meta">${esc((t.assigneeIds||[]).map(personName).join(", ")||"Unassigned")}${t.end?" · until "+timeText(t.end):""}</div></div><span class="status-dot ${statusFor(t)}" title="${statusFor(t)}"></span></button>`).join(""):empty("Nothing scheduled yet","Create a task and it will appear here.");
   $("householdMini").innerHTML=state.people.filter(p=>p.active!==false).length?state.people.filter(p=>p.active!==false).map(p=>`<div class="person-mini"><span class="person-dot" style="--person-color:${p.color}"></span><span class="person-name">${esc(p.name)}</span><span class="person-count">${p.role}</span></div>`).join(""):empty("Add your household","Create member profiles to assign responsibilities.");
   const dinner=Cloud.getState().meals.find(m=>m.date===keyDate() && m.type==="dinner");
@@ -226,6 +226,162 @@ function renderLedger() {
 }
 function addDays(date,amount){const d=new Date(date);d.setDate(d.getDate()+amount);return d;}
 function formatMonth(date){return date.toLocaleDateString(undefined,{month:"long",year:"numeric"});}
+
+// WIWY 0.9.5 — recurring family and civic observances.
+// Preferences are local to this device; the observances themselves are generated
+// from dates and profile birth dates so they never become stale one-off events.
+const OBSERVANCE_PREF_KEY = "wiwy.observances.v1";
+const OBSERVANCE_DEFAULTS = {
+  federal:true, catholic:true, family:true, civic:true,
+  items:{}
+};
+function observancePrefs(){
+  try {
+    const saved=JSON.parse(localStorage.getItem(OBSERVANCE_PREF_KEY)||"{}");
+    return {...OBSERVANCE_DEFAULTS,...saved,items:{...(saved.items||{})}};
+  } catch { return {...OBSERVANCE_DEFAULTS,items:{}}; }
+}
+function saveObservancePrefs(prefs){ localStorage.setItem(OBSERVANCE_PREF_KEY,JSON.stringify(prefs)); }
+function nthWeekday(year,month,weekday,n){
+  const first=new Date(year,month,1,12);
+  return new Date(year,month,1+((weekday-first.getDay()+7)%7)+(n-1)*7,12);
+}
+function lastWeekday(year,month,weekday){
+  const last=new Date(year,month+1,0,12);
+  return new Date(year,month+1,0-((last.getDay()-weekday+7)%7),12);
+}
+function easterSunday(year){
+  const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),
+    g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,
+    l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+    month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
+  return new Date(year,month-1,day,12);
+}
+function addCalendarDays(date,days){const d=new Date(date);d.setDate(d.getDate()+days);return d;}
+function dateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function observedFederalDate(date){
+  const d=new Date(date);
+  if(d.getDay()===6)d.setDate(d.getDate()-1);
+  else if(d.getDay()===0)d.setDate(d.getDate()+1);
+  return d;
+}
+function observancesForYear(year){
+  const out=[];
+  const add=(id,title,date,category,reminder=false,notes="")=>out.push({id,title,date:dateKey(date),category,reminder,notes});
+  const fixed=(month,day)=>new Date(year,month-1,day,12);
+  // U.S. federal holidays (observed dates where applicable).
+  [
+    ["new-year","New Year's Day",fixed(1,1)],
+    ["juneteenth","Juneteenth National Independence Day",fixed(6,19)],
+    ["independence","Independence Day",fixed(7,4)],
+    ["veterans","Veterans Day",fixed(11,11)],
+    ["christmas-federal","Christmas Day",fixed(12,25)]
+  ].forEach(([id,title,d])=>add(id,title,observedFederalDate(d),"federal"));
+  add("mlk","Birthday of Martin Luther King, Jr.",nthWeekday(year,0,1,3),"federal");
+  add("presidents","Washington's Birthday (Presidents Day)",nthWeekday(year,1,1,3),"federal");
+  add("memorial","Memorial Day",lastWeekday(year,4,1),"federal");
+  add("labor","Labor Day",nthWeekday(year,8,1,1),"federal");
+  add("columbus","Columbus Day",nthWeekday(year,9,1,2),"federal");
+  add("thanksgiving","Thanksgiving Day",nthWeekday(year,10,4,4),"federal");
+  // Catholic solemnities and major liturgical days. Ascension and Corpus Christi
+  // use the Sunday observance common in the United States.
+  const easter=easterSunday(year);
+  const catholic=[
+    ["mary-mother-god","Mary, Mother of God",fixed(1,1)],
+    ["epiphany","Epiphany of the Lord",(function(){const d=nthWeekday(year,0,0,1);return d.getDate()===1?addCalendarDays(d,7):d;})()],
+    ["baptism","Baptism of the Lord",(function(){const e=nthWeekday(year,0,0,1);const ep=e.getDate()===1?addCalendarDays(e,7):e;return ep.getDate()>=7?addCalendarDays(ep,1):addCalendarDays(ep,7);})()],
+    ["presentation","Presentation of the Lord",fixed(2,2)],
+    ["ash-wednesday","Ash Wednesday",addCalendarDays(easter,-46)],
+    ["st-joseph","Saint Joseph, Spouse of the Blessed Virgin Mary",fixed(3,19)],
+    ["annunciation","Annunciation of the Lord",fixed(3,25)],
+    ["palm-sunday","Palm Sunday",addCalendarDays(easter,-7)],
+    ["holy-thursday","Holy Thursday",addCalendarDays(easter,-3)],
+    ["good-friday","Good Friday",addCalendarDays(easter,-2)],
+    ["easter","Easter Sunday",easter],
+    ["ascension","Ascension of the Lord",addCalendarDays(easter,42)],
+    ["pentecost","Pentecost Sunday",addCalendarDays(easter,49)],
+    ["trinity","Trinity Sunday",addCalendarDays(easter,56)],
+    ["corpus-christi","The Most Holy Body and Blood of Christ (Corpus Christi)",addCalendarDays(easter,63)],
+    ["sacred-heart","Most Sacred Heart of Jesus",addCalendarDays(easter,68)],
+    ["assumption","Assumption of the Blessed Virgin Mary",fixed(8,15)],
+    ["all-saints","All Saints",fixed(11,1)],
+    ["all-souls","Commemoration of All the Faithful Departed",fixed(11,2)],
+    ["christ-king","Our Lord Jesus Christ, King of the Universe",fixed(11,22)]
+  ];
+  // Christ the King is the final Sunday of the liturgical year: Sunday before Advent.
+  const advent1=new Date(year,10,27,12);
+  while(advent1.getDay()!==0)advent1.setDate(advent1.getDate()+1);
+  const christKing=addCalendarDays(advent1,-7);
+  catholic[catholic.length-1][2]=christKing;
+  catholic.push(
+    ["immaculate-conception","Immaculate Conception",fixed(12,8)],
+    ["our-lady-guadalupe","Our Lady of Guadalupe",fixed(12,12)],
+    ["christmas-catholic","Nativity of the Lord (Christmas)",fixed(12,25)]
+  );
+  catholic.forEach(([id,title,d])=>add(id,title,d,"catholic"));
+  // Family observances: all birthdays and the annual family dates.
+  const people=Cloud.getState().people||[];
+  people.forEach(p=>{
+    const birth=p.birthDate||p.birth_date;
+    if(!birth)return;
+    const [,mm,dd]=birth.split("-").map(Number);
+    const d=fixed(mm,dd);
+    add(`birthday-${p.id}`,`${p.name}'s birthday`,d,"family",true,"Birthday reminder");
+  });
+  add("anniversary","Wedding anniversary",fixed(8,4),"family",true,"Anniversary reminder");
+  add("mothers-day","Mother's Day",nthWeekday(year,4,0,2),"family",true,"Mother's Day reminder");
+  add("fathers-day","Father's Day",nthWeekday(year,5,0,3),"family",false);
+  // Common civic observances, displayed without advance alerts.
+  add("valentines","Valentine's Day",fixed(2,14),"civic");
+  add("st-patricks","St. Patrick's Day",fixed(3,17),"civic");
+  add("halloween","Halloween",fixed(10,31),"civic");
+  return out.sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title));
+}
+function observancesForDate(date){
+  const prefs=observancePrefs(), key=dateKey(date);
+  return observancesForYear(date.getFullYear()).filter(o=>
+    prefs[o.category]!==false && prefs.items[o.id]!==false && o.date===key
+  );
+}
+function renderObservanceSettings(){
+  const prefs=observancePrefs(), categories=[
+    ["federal","U.S. federal holidays"],["catholic","Catholic Christian calendar"],
+    ["family","Family dates (birthdays, anniversary, Mother's/Father's Day)"],["civic","Other common civic observances"]
+  ];
+  const year=new Date().getFullYear();
+  const items=observancesForYear(year);
+  $("observanceSettings").innerHTML=categories.map(([key,label])=>
+    `<label class="observance-toggle"><input type="checkbox" data-observance-category="${key}" ${prefs[key]!==false?"checked":""}><span>${label}</span></label>`
+  ).join("")+`<details class="observance-individual"><summary>Choose individual observances</summary><div class="observance-individual-list">${
+    items.map(o=>`<label><input type="checkbox" data-observance-item="${o.id}" ${prefs.items[o.id]!==false?"checked":""}><span>${esc(o.title)}</span></label>`).join("")
+  }</div></details><p class="muted tiny">Birthday entries are generated from each member's saved birth date. Advance alerts apply only to birthdays, the August 4 anniversary, and Mother's Day.</p>`;
+}
+function checkPersonalDateAlerts(){
+  const today=new Date(); today.setHours(12,0,0,0);
+  const targets=[addCalendarDays(today,7),addCalendarDays(today,1)];
+  const due=[];
+  targets.forEach((target,index)=>{
+    const offset=index===0?7:1;
+    observancesForDate(target).filter(o=>o.reminder).forEach(o=>due.push({...o,offset}));
+  });
+  if(!due.length)return;
+  const membership=Cloud.getMembership(), people=Cloud.getState().people||[];
+  const me=people.find(p=>p.id===membership?.member_profile_id);
+  if(!me||!/^Justin\b/i.test(me.name))return;
+  let seen={};try{seen=JSON.parse(localStorage.getItem("wiwy.personal-date-alerts.v1")||"{}");}catch{}
+  due.forEach(o=>{
+    const key=`${o.id}:${o.date}:${o.offset}`;
+    if(seen[key])return;
+    const message=`${o.title} is in ${o.offset} day${o.offset===1?"":"s"}.`;
+    toast(message);
+    if("Notification" in window && Notification.permission==="granted"){
+      try{new Notification("WIWY · Family reminder",{body:message,icon:"./icons/icon-192.png"});}catch{}
+    }
+    seen[key]=new Date().toISOString();
+  });
+  try{localStorage.setItem("wiwy.personal-date-alerts.v1",JSON.stringify(seen));}catch{}
+}
+
 function tasksForDate(date){
   const key=keyDate(date);
   return Cloud.getState().tasks.filter(t=>!t.archived&&taskOccurs(t,key)).sort((x,y)=>(parseTime(x.start)??9999)-(parseTime(y.start)??9999));
@@ -241,9 +397,10 @@ function renderCalendar(){
     const cells=[];
     for(let i=0;i<offset;i++)cells.push(`<div class="month-empty"></div>`);
     for(let n=1;n<=daysInMonth;n++){
-      const d=new Date(first.getFullYear(),first.getMonth(),n,12), k=keyDate(d), tasks=tasksForDate(d), isToday=k===keyDate(), selected=k===key;
-      const dots=tasks.slice(0,5).map(t=>`<i style="--person-color:${personColor(t.assigneeIds?.[0])}"></i>`).join("");
-      cells.push(`<button class="month-day ${isToday?"is-today":""} ${selected?"is-selected":""}" data-month-date="${k}"><span>${n}</span><small>${tasks.length?tasks.length+" task"+(tasks.length===1?"":"s"):""}</small><div class="month-dots">${dots}</div></button>`);
+      const d=new Date(first.getFullYear(),first.getMonth(),n,12), k=keyDate(d), tasks=tasksForDate(d), obs=observancesForDate(d), isToday=k===keyDate(), selected=k===key;
+      const dots=tasks.slice(0,4).map(t=>`<i style="--person-color:${personColor(t.assigneeIds?.[0])}"></i>`).join("")+(obs.length?'<i class="observance-dot"></i>':"");
+      const label=obs.length?`<em class="month-observance-label">${esc(obs[0].title)}${obs.length>1?` +${obs.length-1}`:""}</em>`:"";
+      cells.push(`<button class="month-day ${isToday?"is-today":""} ${selected?"is-selected":""}" data-month-date="${k}"><span>${n}</span><small>${tasks.length?tasks.length+" task"+(tasks.length===1?"":"s"):""}${obs.length?`${tasks.length?" · ":""}${obs.length} date${obs.length===1?"":"s"}`:""}</small><div class="month-dots">${dots}</div>${label}</button>`);
     }
     $("calendarGrid").innerHTML=`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="month-weekday">${d}</div>`).join("")}${cells.join("")}`;
     return;
@@ -253,15 +410,15 @@ function renderCalendar(){
     $("calendarDate").textContent=`${days[0].toLocaleDateString(undefined,{month:"short",day:"numeric"})} – ${days[6].toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}`;
     $("calendarGrid").className="calendar-grid week-grid";
     $("calendarGrid").innerHTML=days.map(d=>{
-      const k=keyDate(d), tasks=tasksForDate(d);
-      return `<section class="week-day ${k===keyDate()?"is-today":""}"><button class="week-day-head" data-month-date="${k}"><strong>${shortDays[d.getDay()]}</strong><span>${d.getDate()}</span></button><div class="week-day-tasks">${tasks.length?tasks.map(t=>`<button class="week-task" data-calendar-task="${t.id}" data-task-date="${k}" style="--person-color:${personColor(t.assigneeIds?.[0])}"><strong>${esc(t.name)}</strong><small>${timeText(t.start)}</small></button>`).join(""):`<span class="week-no-tasks">—</span>`}</div></section>`;
+      const k=keyDate(d), tasks=tasksForDate(d), obs=observancesForDate(d);
+      return `<section class="week-day ${k===keyDate()?"is-today":""}"><button class="week-day-head" data-month-date="${k}"><strong>${shortDays[d.getDay()]}</strong><span>${d.getDate()}</span></button><div class="week-day-tasks">${obs.map(o=>`<div class="calendar-observance ${o.category}"><strong>${esc(o.title)}</strong><small>${esc(o.category==="family"?"Family date":o.category==="catholic"?"Catholic observance":o.category==="federal"?"Federal holiday":"Observance")}</small></div>`).join("")}${tasks.length?tasks.map(t=>`<button class="week-task" data-calendar-task="${t.id}" data-task-date="${k}" style="--person-color:${personColor(t.assigneeIds?.[0])}"><strong>${esc(t.name)}</strong><small>${timeText(t.start)}</small></button>`).join(""):(!obs.length?`<span class="week-no-tasks">—</span>`:"")}</div></section>`;
     }).join("");
     return;
   }
   $("calendarDate").textContent=dateLabel(calendarDate);
   $("calendarGrid").className="calendar-grid day-grid";
-  const tasks=tasksForDate(calendarDate);
-  let html="";
+  const tasks=tasksForDate(calendarDate), obs=observancesForDate(calendarDate);
+  let html=obs.length?`<section class="day-observances">${obs.map(o=>`<div class="calendar-observance ${o.category}"><strong>${esc(o.title)}</strong><small>${esc(o.notes||({federal:"U.S. federal holiday",catholic:"Catholic observance",family:"Family date",civic:"Observance"}[o.category]))}</small></div>`).join("")}</section>`:"";
   for(let h=6;h<23;h++){
     const label=new Date(2000,0,1,h).toLocaleTimeString([],{hour:"numeric"});
     const items=tasks.filter(t=>Math.floor((parseTime(t.start)??9*60)/60)===h);
@@ -273,7 +430,7 @@ function render() {
   const visibleWorkspaceName = authenticatedWorkspace?.name || Store.getState().workspace.name;
   $("workspaceName").textContent = visibleWorkspaceName;
   $("settingsWorkspace").value = visibleWorkspaceName;
-  renderToday();renderTasks();renderMeals();renderGroceries();renderPeople();renderLedger();renderCalendar();
+  renderToday();renderTasks();renderMeals();renderGroceries();renderPeople();renderLedger();renderCalendar();renderObservanceSettings();
   const away=Cloud.getAwayPeriods();
   $("awayButton").innerHTML=away.length?`<img src="./icons/away-suitcase.svg" alt="" class="away-suitcase-icon"> <span class="desktop-only">Away mode on</span>`:`<img src="./icons/away-suitcase.svg" alt="" class="away-suitcase-icon"> <span class="desktop-only">Away mode</span>`;
   const unreadNotifications=Cloud.getNotifications().filter(n=>!n.read_at).length;
@@ -877,6 +1034,12 @@ function setup() {
       $("profileButton").setAttribute("aria-expanded", "false");
     }
   });
+  $("observanceSettings").addEventListener("change",e=>{
+    const prefs=observancePrefs(), target=e.target;
+    if(target.matches("[data-observance-category]"))prefs[target.dataset.observanceCategory]=target.checked;
+    if(target.matches("[data-observance-item]"))prefs.items[target.dataset.observanceItem]=target.checked;
+    saveObservancePrefs(prefs);renderCalendar();
+  });
   document.querySelectorAll("[data-cal-mode]").forEach(b=>b.onclick=()=>{calendarMode=b.dataset.calMode;calendarReturnToMonth=false;renderCalendar();});
   $("prevDay").onclick=()=>{if(calendarMode==="day")calendarDate=addDays(calendarDate,-1);else if(calendarMode==="week")calendarDate=addDays(calendarDate,-7);else{const day=calendarDate.getDate();calendarDate.setDate(1);calendarDate.setMonth(calendarDate.getMonth()-1);calendarDate.setDate(Math.min(day,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,0).getDate()));}renderCalendar();};
   $("nextDay").onclick=()=>{if(calendarMode==="day")calendarDate=addDays(calendarDate,1);else if(calendarMode==="week")calendarDate=addDays(calendarDate,7);else{const day=calendarDate.getDate();calendarDate.setDate(1);calendarDate.setMonth(calendarDate.getMonth()+1);calendarDate.setDate(Math.min(day,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,0).getDate()));}renderCalendar();};
@@ -900,6 +1063,8 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) naviga
       avatar.setAttribute("aria-expanded", "false");
     }
     setup();
+    checkPersonalDateAlerts();
+    window.setInterval(checkPersonalDateAlerts, 60*60*1000);
     document.addEventListener("wiwy-cloud-updated", () => { render(); });
     toast("Connected. Household tasks are syncing.");
   } catch (error) {
