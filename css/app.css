@@ -410,3 +410,11 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 .import-profile-row select{min-width:0;width:100%}
 .import-warning{padding:13px 15px;border:1px solid var(--line);border-radius:12px;margin:16px 0}.import-warning p{margin:5px 0 0;color:var(--muted);font-size:.88rem}
 @media(max-width:560px){.import-counts{grid-template-columns:1fr}.import-profile-row{grid-template-columns:1fr}}
+
+
+/* WIWY 0.9.4 — transactional household import controls */
+.import-mode{display:grid;gap:8px;margin:18px 0 12px}
+.import-mode label{font-weight:700}
+.import-mode select{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line,#d8d4ca);border-radius:10px;background:var(--panel,#fff);color:inherit;font:inherit}
+#importModeNotice{margin:12px 0}
+#importModeNotice p{margin:6px 0 0}
