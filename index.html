@@ -120,7 +120,12 @@
         <div class="settings-grid">
           <div class="panel settings-card"><span class="eyebrow">WORKSPACE</span><h3>Workspace settings</h3><label>Workspace name<input id="settingsWorkspace" value="Our Home"></label><button class="primary-button" id="saveWorkspace">Save name</button></div>
           <div class="panel settings-card"><span class="eyebrow">DATA</span><h3>Cloud backup</h3><p class="muted">Export a complete portable backup or import a WIWY JSON backup into this household. Imports are reviewed before anything is written.</p><div class="button-row"><button class="secondary-button" id="exportData">Export household JSON</button><button class="primary-button" id="importData">Import household JSON</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div>
-          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Version 0.9.3 · Import preview</div></div>
+          <div class="panel settings-card observance-settings-card">
+            <span class="eyebrow">CALENDAR</span><h3>Calendar observances</h3>
+            <p class="muted">Choose which holidays and family dates appear on the calendar. Personal-date alerts are limited to birthdays, your anniversary, and Mother's Day.</p>
+            <div id="observanceSettings" class="observance-settings"></div>
+          </div>
+          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Version 0.9.5 · Calendar & family dates</div></div>
         </div>
       </section>
 
