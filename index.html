@@ -119,8 +119,8 @@
       <section class="view" id="view-settings">
         <div class="settings-grid">
           <div class="panel settings-card"><span class="eyebrow">WORKSPACE</span><h3>Workspace settings</h3><label>Workspace name<input id="settingsWorkspace" value="Our Home"></label><button class="primary-button" id="saveWorkspace">Save name</button></div>
-          <div class="panel settings-card"><span class="eyebrow">DATA</span><h3>Cloud backup</h3><p class="muted">Export a complete portable backup of this household from Supabase. Restore and Merge will be enabled after the transactional import engine is installed.</p><div class="button-row"><button class="secondary-button" id="exportData">Export household JSON</button><button class="secondary-button" id="importData" disabled title="Cloud import is being completed">Import / Restore (coming soon)</button></div></div>
-          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Version 0.9.1</div></div>
+          <div class="panel settings-card"><span class="eyebrow">DATA</span><h3>Cloud backup</h3><p class="muted">Export a complete portable backup or import a WIWY JSON backup into this household. Imports are reviewed before anything is written.</p><div class="button-row"><button class="secondary-button" id="exportData">Export household JSON</button><button class="primary-button" id="importData">Import household JSON</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div>
+          <div class="panel settings-card"><span class="eyebrow">ABOUT</span><h3>Built for real life.</h3><p class="muted">WIWY is designed around workspaces, flexible responsibilities, and a shared family rhythm. More modules will arrive in stages.</p><div class="version">WIWY · Version 0.9.3 · Import preview</div></div>
         </div>
       </section>
 
@@ -202,6 +202,16 @@
 
   <div id="toast" class="toast" popover="manual" role="status" aria-live="polite"></div>
   <script type="module" src="./js/app.js"></script>
+
+  <dialog id="importPreviewDialog" class="modal import-modal">
+    <div class="modal-head"><div><span class="eyebrow">HOUSEHOLD DATA</span><h2>Review backup import</h2></div><button class="close-button" id="closeImportPreview" aria-label="Close">×</button></div>
+    <p id="importFileSummary" class="muted">Choose a WIWY backup to inspect.</p>
+    <div id="importValidation" class="import-validation" role="status"></div>
+    <div id="importCounts" class="import-counts"></div>
+    <section class="import-profiles"><h3>Household member matching</h3><p class="muted small-note">Matching suggestions are not applied automatically. Review each mapping before continuing.</p><div id="importProfileMappings"></div></section>
+    <div class="import-warning"><strong>Nothing has been imported yet.</strong><p>Reviewing a file does not change your household. Import execution will be enabled after the database transaction migration is installed.</p></div>
+    <div class="modal-actions"><button type="button" class="secondary-button" id="cancelImportPreview">Close</button><span></span><button type="button" class="primary-button" id="confirmImportPreview" disabled>Import (database step pending)</button></div>
+  </dialog>
 
   <dialog id="taskDetailDialog" class="modal task-detail-modal">
     <div class="modal-head"><div><span class="eyebrow">TASK DETAILS</span><h2 id="taskDetailTitle">Task</h2></div><button class="close-button" id="closeTaskDetail" aria-label="Close">×</button></div>
