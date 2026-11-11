@@ -465,7 +465,7 @@ function render() {
 }
 
 // WIWY 0.9.6 — user-controlled application updates.
-const WIWY_VERSION="0.9.6";
+const WIWY_VERSION="0.9.7";
 let wiwyRegistration=null;
 let updateInstallInProgress=false;
 function showUpdateBanner(version,notes=""){
@@ -875,6 +875,26 @@ function setup() {
     catch(error){select.value=previous;toast("Role change failed: "+error.message);}
     finally{select.disabled=false;}
   });
+  async function requestMemberInvitation(person) {
+    const dialog=$("memberInviteDialog"), form=$("memberInviteForm");
+    $("memberInvitePerson").textContent=`Create an invitation for ${person?.name||"this household member"}.`;
+    $("memberInviteEmail").value="";
+    $("memberInviteRole").value="Member";
+    return new Promise(resolve=>{
+      let settled=false;
+      const finish=value=>{if(settled)return;settled=true;dialog.close();form.removeEventListener("submit",submit);$("cancelMemberInvite").removeEventListener("click",cancel);$("closeMemberInvite").removeEventListener("click",cancel);dialog.removeEventListener("cancel",onCancel);resolve(value);};
+      const submit=event=>{event.preventDefault();if(!form.reportValidity())return;finish({email:$("memberInviteEmail").value.trim(),role:$("memberInviteRole").value});};
+      const cancel=()=>finish(null);
+      const onCancel=event=>{event.preventDefault();finish(null);};
+      form.addEventListener("submit",submit);
+      $("cancelMemberInvite").addEventListener("click",cancel);
+      $("closeMemberInvite").addEventListener("click",cancel);
+      dialog.addEventListener("cancel",onCancel);
+      dialog.showModal();
+      $("memberInviteEmail").focus();
+    });
+  }
+
   $("peopleGrid").addEventListener("click", async event => {
     const toggle = event.target.closest("[data-profile-toggle]");
     const request = event.target.closest("[data-profile-request]");
@@ -886,16 +906,11 @@ function setup() {
     try {
       if (inviteProfile) {
         const person=Cloud.getState().people.find(p=>p.id===inviteProfile.dataset.inviteProfile);
-        const email=prompt(`Email address for ${person?.name||"this household member"}:`);
-        if(!email)return;
-        const role=prompt("Initial role: Admin, Manager, or Member","Member");
-        if(!role)return;
-        const normalized=role.trim().toLowerCase();
-        const selectedRole=({admin:"Admin",manager:"Manager",member:"Member"})[normalized];
-        if(!selectedRole){toast("Choose Admin, Manager, or Member.");return;}
-        const link=await Cloud.createMemberInvitation(inviteProfile.dataset.inviteProfile,email,selectedRole);
-        try{await navigator.clipboard.writeText(link);toast("Invitation link copied. Send it to "+email+".");}
-        catch{prompt("Copy this invitation link and send it to "+email+":",link);}
+        const invitation=await requestMemberInvitation(person);
+        if(!invitation)return;
+        const link=await Cloud.createMemberInvitation(inviteProfile.dataset.inviteProfile,invitation.email,invitation.role);
+        try{await navigator.clipboard.writeText(link);toast("Invitation link copied. Send it to "+invitation.email+".");}
+        catch{prompt("Copy this invitation link and send it to "+invitation.email+":",link);}
       } else if (toggle) {
         const active = toggle.dataset.nextActive === "true";
         const person = Cloud.getState().people.find(p => p.id === toggle.dataset.profileToggle);
