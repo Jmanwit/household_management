@@ -418,3 +418,71 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 .import-mode select{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line,#d8d4ca);border-radius:10px;background:var(--panel,#fff);color:inherit;font:inherit}
 #importModeNotice{margin:12px 0}
 #importModeNotice p{margin:6px 0 0}
+
+
+/* WIWY 0.9.5 — forest-green dimensional dashboard header */
+.topbar{
+  position:relative;isolation:isolate;overflow:hidden;
+  margin:-20px -20px 0;padding:18px 20px 22px;
+  border:1px solid rgba(231,215,174,.18);border-bottom:1px solid rgba(20,45,31,.35);
+  border-radius:0 0 24px 24px;
+  background:
+    radial-gradient(ellipse at 50% -35%,rgba(255,255,255,.22),transparent 58%),
+    radial-gradient(ellipse at 15% 120%,rgba(9,28,17,.38),transparent 56%),
+    linear-gradient(168deg,#315f43 0%,#244b35 38%,#183c2b 72%,#214a34 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -9px 18px rgba(5,20,12,.2),0 9px 22px rgba(28,48,32,.12);
+}
+.topbar:before{
+  content:"";position:absolute;z-index:-1;inset:-45% -8% 22%;pointer-events:none;
+  border-radius:0 0 55% 45%;
+  background:linear-gradient(176deg,rgba(255,255,255,.16),rgba(255,255,255,.035) 36%,transparent 68%);
+  transform:rotate(-2deg);
+}
+.topbar:after{
+  content:"";position:absolute;z-index:-1;left:-8%;right:-8%;bottom:-31px;height:58px;
+  border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0));
+  filter:blur(2px);pointer-events:none;
+}
+.header-brand-row span{color:#e1c17c;text-shadow:0 1px 1px rgba(0,0,0,.28)}
+.header-controls-row .page-heading{padding:7px 15px 8px;border:1px solid rgba(231,215,174,.34);border-radius:13px;
+  background:linear-gradient(145deg,rgba(255,250,232,.14),rgba(255,255,255,.055));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 12px rgba(8,25,14,.12);
+}
+.header-controls-row .date-stack{color:#ead9b2;font-size:10px;letter-spacing:.09em}
+.header-controls-row .date-stack strong{font-size:12px;letter-spacing:.035em;color:#fff7e4;margin-top:2px}
+.header-controls-row .page-heading h1{color:#fff8e8}
+.header-nav-controls .page-back,.header-nav-controls .mobile-menu,
+.top-actions .icon-button,.top-actions .avatar{
+  box-shadow:0 2px 7px rgba(5,20,12,.12);
+}
+.topbar .header-nav-controls .mobile-menu{color:#4a3d2d;background:#fff9eb;border-color:#d7c8a9}
+.topbar .header-nav-controls .page-back{color:#4a3d2d;background:#fff9eb;border-color:#d7c8a9}
+.topbar .top-actions .icon-button{background:#fff9eb;border-color:#d7c8a9;color:#b18b4b}
+.topbar .top-actions .avatar{background:#dce9dc;border-color:#b7cbb8;color:#315b43}
+.observance-settings{display:grid;gap:9px}
+.observance-toggle,.observance-individual-list label{display:flex!important;grid-template-columns:none!important;flex-direction:row;align-items:center;gap:10px!important;color:var(--text)!important;font-size:12px!important}
+.observance-toggle input,.observance-individual-list input{width:17px;height:17px;accent-color:#315b43}
+.observance-individual{border-top:1px solid var(--line);padding-top:10px;margin-top:3px}
+.observance-individual summary{cursor:pointer;font-size:12px;font-weight:750;color:var(--gold)}
+.observance-individual-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px 0}
+.month-observance-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;font-style:normal;color:#a9894c;line-height:1.15;margin-top:2px}
+.month-dots .observance-dot{background:#b18b4b;box-shadow:0 0 0 1px rgba(177,139,75,.22)}
+.calendar-observance{display:grid;gap:3px;padding:8px 10px;margin:3px 0;border-left:3px solid #b18b4b;border-radius:7px;background:rgba(177,139,75,.10);font-size:11px}
+.calendar-observance small{color:var(--muted);font-size:9px}
+.calendar-observance.catholic{border-left-color:#8b75a9;background:rgba(139,117,169,.10)}
+.calendar-observance.family{border-left-color:#a66b55;background:rgba(166,107,85,.10)}
+.calendar-observance.federal{border-left-color:#6685a3;background:rgba(102,133,163,.10)}
+.calendar-observance.civic{border-left-color:#8a967d}
+.day-observances{grid-column:1/-1;display:grid;gap:5px;padding:0 0 10px}
+@media(max-width:620px){
+  .topbar{margin:-14px -12px 0;padding:14px 12px 18px;border-radius:0 0 19px 19px}
+  .header-brand-row{min-height:54px}
+  .header-brand-row img{width:46px;height:46px;flex-basis:46px}
+  .header-brand-row span{font-size:clamp(18px,5vw,24px)}
+  .header-controls-row{grid-template-columns:minmax(38px,.8fr) minmax(110px,1.2fr) minmax(112px,1fr);gap:5px}
+  .header-controls-row .page-heading{padding:6px 8px}
+  .header-controls-row .date-stack{font-size:9px}
+  .header-controls-row .date-stack strong{font-size:11px}
+  .observance-individual-list{grid-template-columns:1fr}
+  .month-observance-label{max-width:100%;font-size:7px}
+}
