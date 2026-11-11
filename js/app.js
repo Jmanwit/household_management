@@ -678,8 +678,28 @@ function setup() {
       toast("Workspace name saved.");
     } catch (error) { toast("Could not save workspace name: " + error.message); }
   };
-  $("exportData").onclick=()=>{const blob=new Blob([Store.exportState()],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wiwy-backup-"+keyDate()+".json";a.click();URL.revokeObjectURL(a.href);};
-  $("importData").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{Store.importState(JSON.parse(await f.text()));render();toast("Backup imported.");}catch(err){alert(err.message);}e.target.value="";};
+  $("exportData").onclick=async()=>{
+    const button=$("exportData");
+    button.disabled=true;
+    const original=button.textContent;
+    button.textContent="Preparing cloud backup…";
+    try {
+      const backup=await Cloud.exportHouseholdBackup();
+      const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;
+      a.download="wiwy-household-backup-"+keyDate()+".json";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      toast("Cloud household backup exported.");
+    } catch(error) {
+      alert("Could not export household backup: "+error.message);
+    } finally {
+      button.disabled=false;
+      button.textContent=original;
+    }
+  };
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
   $("closeAwayDialog").onclick=()=>$("awayDialog").close();
   $("awayDialog").addEventListener("cancel",e=>{e.preventDefault();$("awayDialog").close();});

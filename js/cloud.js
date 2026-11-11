@@ -511,3 +511,20 @@ export async function disableAway({periodId}={}) {
   await refresh();
   document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
 }
+
+// Export a complete, portable cloud backup. The RPC excludes authentication,
+// membership, permissions, notifications, and other account/security records.
+export async function exportHouseholdBackup() {
+  if (!client || !workspace) throw new Error("WIWY cloud connection is not initialized.");
+  if (!user?.id) throw new Error("You must be signed in to export household data.");
+  const { data, error } = await client.rpc("wiwy_export_household_backup", {
+    target_workspace: workspace.id
+  });
+  if (error) throw error;
+  if (!data || data.format !== "wiwy-household-backup" ||
+      data.schemaVersion !== 1 || !data.data) {
+    throw new Error("The server returned an invalid WIWY backup.");
+  }
+  return data;
+}
+
