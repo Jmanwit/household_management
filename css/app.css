@@ -533,3 +533,7 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 }
 
 #memberAdminPanel[hidden]{display:none}
+
+/* WIWY 0.9.7 household invitation dialog */
+#memberInviteDialog .small-note{margin:0 0 4px}
+#memberInviteRole{min-height:44px}
