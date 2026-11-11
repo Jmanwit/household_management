@@ -3,6 +3,9 @@ import * as Cloud from "./cloud.js";
 import { requireAuth, renameActiveWorkspace, getSignedInUser } from "./auth.js";
 
 const $ = id => document.getElementById(id);
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
 const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const shortDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let currentView = "today", taskFilter = "all", calendarMode = "day", selectedDays = new Set(), operations = [], customReminderOffsets = [], viewHistory = [];
@@ -700,6 +703,75 @@ function setup() {
       button.textContent=original;
     }
   };
+
+  // Import intake: validate the complete portable envelope and prepare an explicit
+  // profile-mapping preview. No database writes occur in this preview stage.
+  let pendingBackup = null;
+  const collectionLabels = {
+    people:"Household members",tasks:"Tasks",taskOperations:"Task steps",taskAssignments:"Task assignments",
+    taskOccurrences:"Task occurrences",taskOccurrenceAssignees:"Occurrence assignees",
+    taskOperationCompletions:"Completed task steps",meals:"Meals",groceries:"Grocery items",
+    events:"Calendar events",awayPeriods:"Away periods",activity:"Activity history"
+  };
+  const requiredCollections = Object.keys(collectionLabels);
+  function validateImportBackup(value) {
+    const errors=[];
+    if (!value || value.format!=="wiwy-household-backup") errors.push("This is not a WIWY household backup.");
+    if (value?.schemaVersion!==1) errors.push("Unsupported backup schema version.");
+    if (!value?.source?.workspaceId || !value?.source?.workspaceName || !value?.data) errors.push("Backup source information or data is missing.");
+    for (const key of requiredCollections) if (!Array.isArray(value?.data?.[key])) errors.push(`Missing or invalid collection: ${key}.`);
+    if (errors.length) return errors;
+    const data=value.data;
+    const ids={};
+    for (const key of requiredCollections) {
+      ids[key]=new Set();
+      for (const row of data[key]) {
+        if (!row || typeof row!=="object" || (key!=="taskAssignments" && key!=="taskOccurrenceAssignees" && !row.id)) errors.push(`${key} contains an invalid record.`);
+        if (row.id && ids[key].has(row.id)) errors.push(`${key} contains duplicate record IDs.`);
+        if (row.id) ids[key].add(row.id);
+      }
+    }
+    const people=ids.people, tasks=ids.tasks, meals=ids.meals, ops=ids.taskOperations, occ=ids.taskOccurrences;
+    const ref=(ok,msg)=>{if(!ok)errors.push(msg);};
+    data.tasks.forEach(x=>{ref(!x.assignee_profile_id||people.has(x.assignee_profile_id),"A task refers to a missing household member.");ref(!x.linked_meal_id||meals.has(x.linked_meal_id),"A task refers to a missing meal.");});
+    data.taskOperations.forEach(x=>ref(tasks.has(x.task_id),"A task step refers to a missing task."));
+    data.taskAssignments.forEach(x=>{ref(tasks.has(x.task_id),"A task assignment refers to a missing task.");ref(people.has(x.member_profile_id),"A task assignment refers to a missing member.");});
+    data.taskOccurrences.forEach(x=>{ref(tasks.has(x.task_id),"A task occurrence refers to a missing task.");ref(!x.assignee_profile_id||people.has(x.assignee_profile_id),"A task occurrence refers to a missing member.");ref(!x.completed_by_profile_id||people.has(x.completed_by_profile_id),"A completed occurrence refers to a missing member.");});
+    data.taskOccurrenceAssignees.forEach(x=>{ref(occ.has(x.occurrence_id),"An occurrence assignment refers to a missing occurrence.");ref(people.has(x.member_profile_id),"An occurrence assignment refers to a missing member.");});
+    data.taskOperationCompletions.forEach(x=>{ref(occ.has(x.occurrence_id),"A completed task step refers to a missing occurrence.");ref(ops.has(x.operation_id),"A completed task step refers to a missing task step.");});
+    data.groceries.forEach(x=>ref(!x.linked_meal_id||meals.has(x.linked_meal_id),"A grocery item refers to a missing meal."));
+    data.events.forEach(x=>ref(!x.assigned_profile_id||people.has(x.assigned_profile_id),"A calendar event refers to a missing member."));
+    data.awayPeriods.forEach(x=>ref(!x.member_profile_id||people.has(x.member_profile_id),"An Away Mode period refers to a missing member."));
+    data.activity.forEach(x=>ref(!x.actor_profile_id||people.has(x.actor_profile_id),"An activity entry refers to a missing member."));
+    return [...new Set(errors)];
+  }
+  function renderImportPreview(backup) {
+    const errors=validateImportBackup(backup);
+    $("importFileSummary").textContent=`${backup.source.workspaceName} · exported ${new Date(backup.exportedAt).toLocaleString()} · ${backup.source.timezone||"Timezone not recorded"}`;
+    $("importValidation").className="import-validation "+(errors.length?"has-errors":"is-valid");
+    $("importValidation").innerHTML=errors.length?`<strong>Backup needs attention</strong><ul>${errors.map(x=>`<li>${escapeHTML(x)}</li>`).join("")}</ul>`:"<strong>Backup structure validated.</strong> All required collections are present and internal references are consistent.";
+    $("importCounts").innerHTML=requiredCollections.map(k=>`<div class="import-count"><span>${collectionLabels[k]}</span><strong>${backup.data[k].length}</strong></div>`).join("");
+    const existing=Cloud.getState().people;
+    $("importProfileMappings").innerHTML=backup.data.people.map(source=>{
+      const exact=existing.filter(p=>p.name.trim().toLocaleLowerCase()===source.display_name.trim().toLocaleLowerCase());
+      const suggestion=exact.length===1?exact[0].id:"";
+      const opts=[`<option value="">Create a separate household profile</option>`,...existing.map(p=>`<option value="${p.id}" ${p.id===suggestion?"selected":""}>${escapeHTML(p.name)}${p.accountId?" · login linked":""}</option>`)].join("");
+      return `<label class="import-profile-row"><span><strong>${escapeHTML(source.display_name)}</strong><small>${source.is_active?"Active in backup":"Inactive in backup"}${exact.length>1?" · multiple name matches":exact.length===1?" · suggested match":" · no exact match"}</small></span><select data-import-profile="${source.id}">${opts}</select></label>`;
+    }).join("")||'<p class="muted">No household profiles in this backup.</p>';
+    $("confirmImportPreview").disabled=true;
+    $("confirmImportPreview").textContent=errors.length?"Fix backup before importing":"Import (database step pending)";
+    pendingBackup=backup;
+  }
+  $("importData").onclick=()=>$("importFile").click();
+  $("importFile").addEventListener("change",async e=>{
+    const file=e.target.files?.[0]; e.target.value=""; if(!file)return;
+    if(file.size>10*1024*1024){toast("Backup file is larger than the 10 MB safety limit.");return;}
+    try {const backup=JSON.parse(await file.text());renderImportPreview(backup);$("importPreviewDialog").showModal();}
+    catch(error){alert("Could not read this JSON backup: "+error.message);}
+  });
+  $("closeImportPreview").onclick=()=>$("importPreviewDialog").close();
+  $("cancelImportPreview").onclick=()=>$("importPreviewDialog").close();
+
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
   $("closeAwayDialog").onclick=()=>$("awayDialog").close();
   $("awayDialog").addEventListener("cancel",e=>{e.preventDefault();$("awayDialog").close();});
