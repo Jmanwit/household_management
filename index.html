@@ -208,9 +208,10 @@
     <p id="importFileSummary" class="muted">Choose a WIWY backup to inspect.</p>
     <div id="importValidation" class="import-validation" role="status"></div>
     <div id="importCounts" class="import-counts"></div>
-    <section class="import-profiles"><h3>Household member matching</h3><p class="muted small-note">Matching suggestions are not applied automatically. Review each mapping before continuing.</p><div id="importProfileMappings"></div></section>
-    <div class="import-warning"><strong>Nothing has been imported yet.</strong><p>Reviewing a file does not change your household. Import execution will be enabled after the database transaction migration is installed.</p></div>
-    <div class="modal-actions"><button type="button" class="secondary-button" id="cancelImportPreview">Close</button><span></span><button type="button" class="primary-button" id="confirmImportPreview" disabled>Import (database step pending)</button></div>
+    <section class="import-profiles"><h3>Household member matching</h3><p class="muted small-note">Review every suggested match. Choose “Create a separate household profile” to keep a person separate from existing profiles.</p><div id="importProfileMappings"></div></section>
+    <section class="import-mode"><label for="importMode">Import method</label><select id="importMode"><option value="merge">Merge — keep existing household records</option><option value="replace">Replace — replace portable household content</option></select></section>
+    <div id="importModeNotice" class="import-warning" aria-live="polite"></div>
+    <div class="modal-actions"><button type="button" class="secondary-button" id="cancelImportPreview">Close</button><span></span><button type="button" class="primary-button" id="confirmImportPreview" disabled>Merge household data</button></div>
   </dialog>
 
   <dialog id="taskDetailDialog" class="modal task-detail-modal">
