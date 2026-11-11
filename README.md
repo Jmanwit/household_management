@@ -57,3 +57,32 @@ This is a foundation, not the finished product. Known next steps:
 - Roles belong to a workspace membership, not globally to an account.
 - Keep household-specific routines as user-created data, not hardcoded application behavior.
 - Preserve history when task definitions or assignments change.
+
+
+## Cloud household backup export (0.9.2 work-in-progress)
+
+This source package adds a **cloud-backed JSON export**. It exports the portable household collections from the currently selected Supabase workspace:
+
+- People and profile details
+- Tasks, operations, assignments, occurrences, occurrence assignees, and step completions
+- Meals and groceries
+- Calendar events and Away Mode periods
+- Activity history
+
+Authentication credentials, Supabase user IDs, workspace memberships, permissions, notifications, and profile-removal requests are intentionally excluded.
+
+### Install the export RPC
+
+1. Open the Supabase SQL Editor for the WIWY project.
+2. Paste and run `supabase/migrations/WIWY_0.9.2_Cloud_Backup_Export.sql`.
+3. Confirm Supabase reports `Success. No rows returned`.
+4. Deploy this source package to the existing GitHub Pages repository.
+5. Sign in to WIWY, open Settings, and use **Export household JSON**.
+
+The export function is read-only and checks that the signed-in user is a member of the requested destination workspace.
+
+### Import status
+
+Cloud import/restore is deliberately disabled in this build. The previous local-only import path has been removed from the Settings workflow so a JSON file cannot appear to restore shared Supabase data when it only changes one device's local storage. Replace/Merge import, profile mapping, and rollback must be delivered as a separate tested server-side implementation before being enabled.
+
+This is an incremental 0.9.2 development package, not a claim that the full import workflow or public tester release is complete.
