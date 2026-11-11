@@ -209,12 +209,16 @@ function renderPeople() {
       <h3>${esc(person.name)}</h3>
       <p>${esc(person.role)} · ${person.accountId ? "Account linked" : "Member profile"} · ${person.active ? "Active" : "Inactive"}</p>
       <div class="person-actions">
-        ${admin ? `<button type="button" class="secondary-button" data-profile-toggle="${person.id}" data-next-active="${person.active ? "false" : "true"}">${person.active ? "Deactivate" : "Reactivate"}</button><button type="button" class="secondary-button danger-button" data-profile-delete="${person.id}">Permanently delete</button>${person.accountId ? `<button type="button" class="secondary-button" data-profile-access="${person.id}">Remove household login access</button>` : ""}` : ""}
+        ${admin ? `<button type="button" class="secondary-button" data-profile-toggle="${person.id}" data-next-active="${person.active ? "false" : "true"}">${person.active ? "Deactivate" : "Reactivate"}</button><button type="button" class="secondary-button danger-button" data-profile-delete="${person.id}">Permanently delete</button>${person.accountId ? `<label class="role-control">Account role<select data-member-role="${person.accountUserId}" data-current-role="${person.accountRole}"><option ${person.accountRole==="Admin"?"selected":""}>Admin</option><option ${person.accountRole==="Manager"?"selected":""}>Manager</option><option ${person.accountRole==="Member"?"selected":""}>Member</option></select></label><button type="button" class="secondary-button" data-profile-access="${person.id}">Remove household login access</button>` : `<button type="button" class="secondary-button" data-invite-profile="${person.id}">Invite / link account</button>`}` : ""}
         ${manager && person.active ? `<button type="button" class="secondary-button" data-profile-request="${person.id}">Request removal</button>` : ""}
       </div>
     </article>`).join("") : empty("Start with your people.", "Add member profiles now. Accounts and invitations can be linked later.");
 
   $("peopleGrid").innerHTML = requestPanel + cards;
+  $("memberAdminPanel").hidden=!admin;
+  $("memberAdminContent").innerHTML=admin
+    ? `<p class="muted small-note">Invite someone to an existing household profile. They create or sign in to their own WIWY account using the invited email address. Their account joins this household rather than creating a separate workspace.</p><p class="muted tiny">Managers receive task-management and assignment permissions. Only Admins can invite accounts or change roles.</p>`
+    : `<p class="muted">Only household Admins can manage account invitations and roles.</p>`;
 }
 function renderLedger() {
   const entries=Cloud.getActivity();
@@ -242,6 +246,8 @@ function observancePrefs(){
   } catch { return {...OBSERVANCE_DEFAULTS,items:{}}; }
 }
 function saveObservancePrefs(prefs){ localStorage.setItem(OBSERVANCE_PREF_KEY,JSON.stringify(prefs)); }
+function customObservances(){try{return JSON.parse(localStorage.getItem("wiwy.custom-observances.v1")||"[]");}catch{return [];}}
+function saveCustomObservances(items){localStorage.setItem("wiwy.custom-observances.v1",JSON.stringify(items));}
 function nthWeekday(year,month,weekday,n){
   const first=new Date(year,month,1,12);
   return new Date(year,month,1+((weekday-first.getDay()+7)%7)+(n-1)*7,12);
@@ -335,6 +341,7 @@ function observancesForYear(year){
   add("valentines","Valentine's Day",fixed(2,14),"civic");
   add("st-patricks","St. Patrick's Day",fixed(3,17),"civic");
   add("halloween","Halloween",fixed(10,31),"civic");
+  customObservances().forEach(o=>{if(o.annual){const [m,d]=o.date.slice(5).split("-").map(Number);add(o.id,o.title,fixed(m,d),o.category||"custom",false,"Custom annual observance");}else if(Number(o.date.slice(0,4))===year){add(o.id,o.title,new Date(o.date+"T12:00:00"),o.category||"custom",false,"Custom one-time observance");}});
   return out.sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title));
 }
 function observancesForDate(date){
@@ -354,7 +361,16 @@ function renderObservanceSettings(){
     `<label class="observance-toggle"><input type="checkbox" data-observance-category="${key}" ${prefs[key]!==false?"checked":""}><span>${label}</span></label>`
   ).join("")+`<details class="observance-individual"><summary>Choose individual observances</summary><div class="observance-individual-list">${
     items.map(o=>`<label><input type="checkbox" data-observance-item="${o.id}" ${prefs.items[o.id]!==false?"checked":""}><span>${esc(o.title)}</span></label>`).join("")
-  }</div></details><p class="muted tiny">Birthday entries are generated from each member's saved birth date. Advance alerts apply only to birthdays, the August 4 anniversary, and Mother's Day.</p>`;
+  }</div></details><div class="custom-observance-editor">
+    <h4>Custom observances</h4>
+    <div class="custom-observance-form">
+      <input id="customObservanceTitle" type="text" placeholder="Observance name" maxlength="80">
+      <input id="customObservanceDate" type="date">
+      <label><input id="customObservanceAnnual" type="checkbox"> Repeat annually</label>
+      <button type="button" class="secondary-button" id="addCustomObservance">Add observance</button>
+    </div>
+    <div class="custom-observance-list">${customObservances().map(o=>`<div class="custom-observance-row"><span>${esc(o.title)} · ${esc(o.date)}${o.annual?" · annual":""}</span><button type="button" class="text-button danger-button" data-delete-observance="${esc(o.id)}">Remove</button></div>`).join("")||'<p class="muted tiny">No custom observances added.</p>'}</div>
+  </div><p class="muted tiny">Birthday entries are generated from each member's saved birth date. Advance alerts apply only to birthdays, the August 4 anniversary, and Mother's Day.</p>`;
 }
 function checkPersonalDateAlerts(){
   const today=new Date(); today.setHours(12,0,0,0);
@@ -446,6 +462,101 @@ function render() {
         return `<div class="away-period-row"><div class="away-period-copy"><strong>${esc(target)}</strong><span>${esc(until)}</span></div><button type="button" class="secondary-button away-cancel-button" data-away-period="${esc(p.id)}">Turn off</button></div>`;
       }).join("")
     : "Away Mode is currently off.";
+}
+
+// WIWY 0.9.6 — user-controlled application updates.
+const WIWY_VERSION="0.9.6";
+let wiwyRegistration=null;
+let updateInstallInProgress=false;
+function showUpdateBanner(version,notes=""){
+  const banner=$("updateBanner");if(!banner)return;
+  banner.hidden=false;
+  $("updateBannerText").textContent=`Version ${version} is ready to review.${notes?" "+notes:""}`;
+}
+function hideUpdateBanner(){const b=$("updateBanner");if(b)b.hidden=true;}
+async function checkForWIWYUpdate(manual=false){
+  const status=$("updateStatus");
+  if(status)status.textContent="Checking for updates…";
+  try{
+    if(!navigator.onLine)throw new Error("Connect to the internet before checking for updates.");
+    const response=await fetch("./wiwy-release.json",{cache:"no-store"});
+    if(!response.ok)throw new Error("The release information could not be reached.");
+    const release=await response.json();
+    $("installedVersion").textContent=`Installed version: ${WIWY_VERSION}`;
+    const newer=compareVersions(release.version,WIWY_VERSION)>0;
+    $("availableVersion").textContent=newer?`Available version: ${release.version}`:`Latest version: ${release.version||WIWY_VERSION}`;
+    if(newer)showUpdateBanner(release.version,release.notes||"");
+    if(!wiwyRegistration)wiwyRegistration=await navigator.serviceWorker.register("./service-worker.js",{updateViaCache:"none"});
+    await wiwyRegistration.update();
+    if(wiwyRegistration.waiting){
+      $("installUpdateButton").hidden=false;
+      if(status)status.textContent=`Version ${release.version} is downloaded and waiting for your approval.`;
+    }else if(newer){
+      if(status)status.textContent="Update found. WIWY is preparing the new application files; check again shortly.";
+    }else if(status)status.textContent="WIWY is up to date.";
+    if(!newer&&!wiwyRegistration.waiting)hideUpdateBanner();
+  }catch(error){if(status)status.textContent=error.message;if(manual)toast("Update check: "+error.message);}
+}
+function compareVersions(a,b){
+  const aa=String(a||"0").split(".").map(Number),bb=String(b||"0").split(".").map(Number);
+  for(let i=0;i<Math.max(aa.length,bb.length);i++){const x=aa[i]||0,y=bb[i]||0;if(x!==y)return x-y;}return 0;
+}
+async function installWIWYUpdate(){
+  if(updateInstallInProgress)return;
+  if(document.querySelector("dialog[open]")){
+    $("updateStatus").textContent="Close or save the open editor before installing. Your unsaved form is being left untouched.";
+    return;
+  }
+  const focused=document.activeElement;
+  if(focused && /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName) && focused.type!=="file" && focused.value!==focused.defaultValue){
+    $("updateStatus").textContent="Finish or save the field you are editing before installing the update.";
+    return;
+  }
+  const worker=wiwyRegistration?.waiting;
+  if(!worker){$("updateStatus").textContent="The update is not downloaded yet. Select Check for Updates again in a moment.";return;}
+  if(!navigator.onLine){$("updateStatus").textContent="Connect to the internet before installing an update.";return;}
+  updateInstallInProgress=true;
+  const button=$("installUpdateButton");button.disabled=true;button.textContent="Preparing…";
+  try{
+    // WIWY writes directly to Supabase; it has no offline write queue. Refresh verifies
+    // the signed-in cloud connection before allowing the application shell to change.
+    await Cloud.prepareForUpdate();
+    if(!await askWIWYConfirm("Install WIWY update?","Your household data is stored in Supabase. WIWY has verified the live connection. The app will reload to finish installing the update.","Install update"))return;
+    $("updateStatus").textContent="Installing update…";
+    const controllerChange=new Promise((resolve,reject)=>{
+      const timeout=setTimeout(()=>reject(new Error("The new version did not take control. The previous app remains available; reload and try again.")),20000);
+      navigator.serviceWorker.addEventListener("controllerchange",()=>{clearTimeout(timeout);resolve();},{once:true});
+    });
+    worker.postMessage({type:"SKIP_WAITING"});
+    await controllerChange;
+    location.reload();
+  }catch(error){$("updateStatus").textContent=error.message;toast("Update not installed: "+error.message);}
+  finally{updateInstallInProgress=false;button.disabled=false;button.textContent="Install update";}
+}
+function setupWIWYUpdates(){
+  if(!("serviceWorker" in navigator))return;
+  navigator.serviceWorker.register("./service-worker.js",{updateViaCache:"none"}).then(reg=>{
+    wiwyRegistration=reg;
+    const ready=()=>{if(reg.waiting){$("installUpdateButton").hidden=false;showUpdateBanner("new version");}};
+    ready();
+    reg.addEventListener("updatefound",()=>{
+      const installing=reg.installing;
+      if(!installing)return;
+      installing.addEventListener("statechange",()=>{
+        if(installing.state==="installed"&&navigator.serviceWorker.controller){
+          $("installUpdateButton").hidden=false;
+          showUpdateBanner("new version");
+          $("updateStatus").textContent="Update downloaded. It will not install until you choose Install update.";
+        }
+      });
+    });
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{});
+    $("reviewUpdateButton").onclick=()=>{setView("settings");$("updateSettingsCard")?.scrollIntoView({behavior:"smooth",block:"center"});};
+    $("checkForUpdates").onclick=()=>checkForWIWYUpdate(true);
+    $("installUpdateButton").onclick=installWIWYUpdate;
+    checkForWIWYUpdate(false);
+    window.setInterval(()=>checkForWIWYUpdate(false),6*60*60*1000);
+  }).catch(error=>console.warn("WIWY update manager:",error));
 }
 
 const WIWY_VAPID_PUBLIC_KEY = "BAbz1r7e2cel3EAcDrGCIgjn3JLxbH28Qu3FiM366-L58-dzLBeVSHw7YDfh1xEzpJLBLx0SaiwRJXAyKOdEEcU";
@@ -753,6 +864,17 @@ function setup() {
   document.querySelectorAll("[data-task-filter]").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.taskFilter;document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x===b));renderTasks();});
   document.querySelectorAll("[data-summary-filter]").forEach(card=>{card.setAttribute("role","button");card.setAttribute("tabindex","0");card.setAttribute("aria-label","Show "+card.dataset.summaryFilter+" tasks");const activate=()=>{taskFilter=card.dataset.summaryFilter;setView("tasks");document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x.dataset.taskFilter===taskFilter));renderTasks();};card.addEventListener("click",activate);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate();}});});
   $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
+  $("peopleGrid").addEventListener("change",async event=>{
+    const select=event.target.closest("[data-member-role]");
+    if(!select)return;
+    const next=select.value,previous=select.dataset.currentRole;
+    if(next===previous)return;
+    if(!await askWIWYConfirm("Change household role?",`Change this account's role from ${previous} to ${next}?`,"Change role")){select.value=previous;return;}
+    select.disabled=true;
+    try{await Cloud.setMemberRole(select.dataset.memberRole,next);render();toast("Household role updated.");}
+    catch(error){select.value=previous;toast("Role change failed: "+error.message);}
+    finally{select.disabled=false;}
+  });
   $("peopleGrid").addEventListener("click", async event => {
     const toggle = event.target.closest("[data-profile-toggle]");
     const request = event.target.closest("[data-profile-request]");
@@ -760,8 +882,21 @@ function setup() {
     const decline = event.target.closest("[data-removal-decline]");
     const permanentDelete = event.target.closest("[data-profile-delete]");
     const removeAccess = event.target.closest("[data-profile-access]");
+    const inviteProfile = event.target.closest("[data-invite-profile]");
     try {
-      if (toggle) {
+      if (inviteProfile) {
+        const person=Cloud.getState().people.find(p=>p.id===inviteProfile.dataset.inviteProfile);
+        const email=prompt(`Email address for ${person?.name||"this household member"}:`);
+        if(!email)return;
+        const role=prompt("Initial role: Admin, Manager, or Member","Member");
+        if(!role)return;
+        const normalized=role.trim().toLowerCase();
+        const selectedRole=({admin:"Admin",manager:"Manager",member:"Member"})[normalized];
+        if(!selectedRole){toast("Choose Admin, Manager, or Member.");return;}
+        const link=await Cloud.createMemberInvitation(inviteProfile.dataset.inviteProfile,email,selectedRole);
+        try{await navigator.clipboard.writeText(link);toast("Invitation link copied. Send it to "+email+".");}
+        catch{prompt("Copy this invitation link and send it to "+email+":",link);}
+      } else if (toggle) {
         const active = toggle.dataset.nextActive === "true";
         const person = Cloud.getState().people.find(p => p.id === toggle.dataset.profileToggle);
         const accepted = await askWIWYConfirm(active ? "Reactivate household member?" : "Deactivate household member?",
@@ -1034,6 +1169,16 @@ function setup() {
       $("profileButton").setAttribute("aria-expanded", "false");
     }
   });
+  $("observanceSettings").addEventListener("click",e=>{
+    const remove=e.target.closest("[data-delete-observance]");
+    if(remove){saveCustomObservances(customObservances().filter(o=>o.id!==remove.dataset.deleteObservance));renderObservanceSettings();renderCalendar();}
+    if(e.target.closest("#addCustomObservance")){
+      const title=$("customObservanceTitle").value.trim(),date=$("customObservanceDate").value,annual=$("customObservanceAnnual").checked;
+      if(!title||!date){toast("Enter an observance name and date.");return;}
+      const items=customObservances();items.push({id:"custom-"+crypto.randomUUID(),title,date,annual,category:"custom"});
+      saveCustomObservances(items);renderObservanceSettings();renderCalendar();toast("Custom observance added.");
+    }
+  });
   $("observanceSettings").addEventListener("change",e=>{
     const prefs=observancePrefs(), target=e.target;
     if(target.matches("[data-observance-category]"))prefs[target.dataset.observanceCategory]=target.checked;
@@ -1047,7 +1192,7 @@ function setup() {
   $("calendarToday").onclick=()=>{calendarDate=new Date();calendarDate.setHours(12,0,0,0);calendarMode="day";calendarReturnToMonth=false;renderCalendar();};
   render();
 }
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+// Service worker registration and user-controlled activation are managed by setupWIWYUpdates().
 (async () => {
   try {
     const auth = await requireAuth();
@@ -1063,6 +1208,7 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) naviga
       avatar.setAttribute("aria-expanded", "false");
     }
     setup();
+    setupWIWYUpdates();
     checkPersonalDateAlerts();
     window.setInterval(checkPersonalDateAlerts, 60*60*1000);
     document.addEventListener("wiwy-cloud-updated", () => { render(); });

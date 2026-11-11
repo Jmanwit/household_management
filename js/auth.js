@@ -24,23 +24,42 @@ async function initClient() {
 }
 
 async function ensureWorkspace(user) {
+  const invitationToken = new URLSearchParams(location.search).get("invite");
+  let invitedWorkspaceId = null;
+  if (invitationToken) {
+    const { data: acceptedInvitation, error: acceptError } = await client.rpc("wiwy_accept_member_invitation", {
+      invitation_token: invitationToken
+    });
+    if (acceptError) throw acceptError;
+    if (!acceptedInvitation?.workspace_id) throw new Error("The invitation response did not identify a household.");
+    invitedWorkspaceId = acceptedInvitation.workspace_id;
+    const cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete("invite");
+    history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+  }
+
   const { data: memberships, error } = await client
     .from("workspace_memberships")
     .select("id, workspace_id, role, member_profile_id, workspaces(id,name,timezone)")
     .eq("user_id", user.id);
   if (error) throw error;
 
-  if (memberships?.length) {
-    activeMembership = memberships[0];
-    activeWorkspace = memberships[0].workspaces;
+  const invitedMembership = invitationToken
+    ? (memberships || []).find(item => item.workspace_id === invitedWorkspaceId)
+    : null;
+  if (invitationToken && !invitedMembership) throw new Error("The invitation was accepted, but its household membership could not be loaded. Sign out and back in.");
+  if (invitedMembership || memberships?.length) {
+    activeMembership = invitedMembership || memberships[0];
+    activeWorkspace = activeMembership.workspaces;
     if (!activeWorkspace) {
-      const { data: ws, error: wsError } = await client.from("workspaces").select("id,name,timezone").eq("id", memberships[0].workspace_id).single();
+      const { data: ws, error: wsError } = await client.from("workspaces").select("id,name,timezone").eq("id", activeMembership.workspace_id).single();
       if (wsError) throw wsError;
       activeWorkspace = ws;
     }
     return;
   }
 
+  if (invitationToken) throw new Error("The invitation was accepted, but WIWY could not load the household membership. Sign out and back in.");
   const name = prompt("What would you like to call your household workspace?", "Our Home");
   if (name === null) throw new Error("Workspace setup was cancelled. Sign in again when you're ready.");
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago";
@@ -100,7 +119,7 @@ export async function requireAuth() {
         if (mode === "signup") {
           result = await client.auth.signUp({
             email, password,
-            options: { data: { full_name: displayName || email.split("@")[0] } }
+            options: { data: { full_name: displayName || email.split("@")[0] }, emailRedirectTo: location.href }
           });
           if (result.error) throw result.error;
           if (!result.data.session) {

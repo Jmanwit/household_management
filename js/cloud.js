@@ -205,7 +205,7 @@ export async function refresh() {
     }
     const linkedByProfile = new Map((membershipsRes.data || []).filter(m=>m.member_profile_id).map(m=>[m.member_profile_id,m]));
     state = {
-      people: (peopleRes.data || []).map(p => { const linked=linkedByProfile.get(p.id); return {id:p.id,name:p.display_name,color:p.color,birthDate:p.birth_date||null,active:p.is_active !== false,role:linked?.role || "Household member",accountRole:linked?.role || null,accountId:linked?.user_id || null}; }),
+      people: (peopleRes.data || []).map(p => { const linked=linkedByProfile.get(p.id); return {id:p.id,name:p.display_name,color:p.color,birthDate:p.birth_date||null,active:p.is_active !== false,role:linked?.role || "Household member",accountRole:linked?.role || null,accountId:linked?.user_id || null,accountUserId:linked?.user_id || null}; }),
       tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences, completions)),
       meals: (mealsRes.data || []).map(m => ({id:m.id,date:m.meal_date,type:m.meal_type,name:m.name,notes:m.notes || "",recipe:m.recipe || {},createdAt:m.created_at})),
       groceries: (groceriesRes.data || []).map(g => ({id:g.id,name:g.name,category:g.category,quantity:g.quantity || "",notes:g.notes || "",done:!!g.is_completed,linkedMealId:g.linked_meal_id || null,createdAt:g.created_at}))
@@ -514,6 +514,33 @@ export async function disableAway({periodId}={}) {
 
 // Export a complete, portable cloud backup. The RPC excludes authentication,
 // membership, permissions, notifications, and other account/security records.
+export async function createMemberInvitation(profileId,email,role="Member") {
+  if (!client || !workspace || !isAdmin()) throw new Error("Only a household Admin can invite accounts.");
+  const {data,error}=await client.rpc("wiwy_create_member_invitation",{
+    target_workspace:workspace.id,target_profile:profileId,target_email:email,target_role:role
+  });
+  if(error)throw error;
+  return `${location.origin}${location.pathname}?invite=${encodeURIComponent(data)}`;
+}
+export async function setMemberRole(userId,role) {
+  if (!client || !workspace || !isAdmin()) throw new Error("Only a household Admin can change roles.");
+  const {data,error}=await client.rpc("wiwy_set_member_role",{
+    target_workspace:workspace.id,target_user:userId,new_role:role
+  });
+  if(error)throw error;
+  await refresh();
+  return data;
+}
+
+export async function prepareForUpdate() {
+  if (!client || !workspace || !user?.id) throw new Error("Sign in before updating WIWY.");
+  if (typeof navigator!=="undefined" && !navigator.onLine) throw new Error("WIWY is offline. Pending cloud changes cannot be verified.");
+  // Current WIWY mutations are awaited Supabase writes, not a local offline queue.
+  // A successful refresh verifies that the household cloud endpoint is reachable.
+  await refresh();
+  return {ready:true,workspaceId:workspace.id};
+}
+
 export async function exportHouseholdBackup() {
   if (!client || !workspace) throw new Error("WIWY cloud connection is not initialized.");
   if (!user?.id) throw new Error("You must be signed in to export household data.");
