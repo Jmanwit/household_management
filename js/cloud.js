@@ -528,3 +528,23 @@ export async function exportHouseholdBackup() {
   return data;
 }
 
+// Import a reviewed portable backup through the transactional server-side RPC.
+// The database function enforces Admin access and keeps account identity separate
+// from portable household content.
+export async function importHouseholdBackup(backup, importMode, profileMapping = {}) {
+  if (!client || !workspace) throw new Error("WIWY cloud connection is not initialized.");
+  if (!user?.id) throw new Error("You must be signed in to import household data.");
+  if (!["merge", "replace"].includes(importMode)) throw new Error("Choose Merge or Replace.");
+  const { data, error } = await client.rpc("wiwy_import_household_backup", {
+    target_workspace: workspace.id,
+    backup,
+    import_mode: importMode,
+    profile_mapping: profileMapping,
+    confirmed: true
+  });
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.message || "The household import did not complete.");
+  await refresh();
+  return data;
+}
+

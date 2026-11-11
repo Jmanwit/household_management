@@ -704,8 +704,8 @@ function setup() {
     }
   };
 
-  // Import intake: validate the complete portable envelope and prepare an explicit
-  // profile-mapping preview. No database writes occur in this preview stage.
+  // Import intake: validate the portable envelope, review profile mapping,
+  // then execute the server-side transaction only after explicit confirmation.
   let pendingBackup = null;
   const collectionLabels = {
     people:"Household members",tasks:"Tasks",taskOperations:"Task steps",taskAssignments:"Task assignments",
@@ -745,6 +745,13 @@ function setup() {
     data.activity.forEach(x=>ref(!x.actor_profile_id||people.has(x.actor_profile_id),"An activity entry refers to a missing member."));
     return [...new Set(errors)];
   }
+  function updateImportModeNotice() {
+    const replace=$("importMode").value==="replace";
+    $("importModeNotice").innerHTML=replace
+      ? "<strong>Replace household content</strong><p>This removes the destination household's existing tasks, task history, meals, groceries, events, Away periods, and activity before importing this backup. Existing profiles, login links, memberships, permissions, and workspace identity are retained. A pre-import snapshot is recorded in the database.</p>"
+      : "<strong>Merge household content</strong><p>Existing records are not overwritten. Records with conflicting IDs are skipped. New profiles are created unless you explicitly map them to existing household profiles.</p>";
+    $("confirmImportPreview").textContent=replace?"Replace household content":"Merge household data";
+  }
   function renderImportPreview(backup) {
     const errors=validateImportBackup(backup);
     $("importFileSummary").textContent=`${backup.source.workspaceName} · exported ${new Date(backup.exportedAt).toLocaleString()} · ${backup.source.timezone||"Timezone not recorded"}`;
@@ -756,11 +763,11 @@ function setup() {
       const exact=existing.filter(p=>p.name.trim().toLocaleLowerCase()===source.display_name.trim().toLocaleLowerCase());
       const suggestion=exact.length===1?exact[0].id:"";
       const opts=[`<option value="">Create a separate household profile</option>`,...existing.map(p=>`<option value="${p.id}" ${p.id===suggestion?"selected":""}>${escapeHTML(p.name)}${p.accountId?" · login linked":""}</option>`)].join("");
-      return `<label class="import-profile-row"><span><strong>${escapeHTML(source.display_name)}</strong><small>${source.is_active?"Active in backup":"Inactive in backup"}${exact.length>1?" · multiple name matches":exact.length===1?" · suggested match":" · no exact match"}</small></span><select data-import-profile="${source.id}">${opts}</select></label>`;
+      return `<label class="import-profile-row"><span><strong>${escapeHTML(source.display_name)}</strong><small>${source.is_active?"Active in backup":"Inactive in backup"}${exact.length>1?" · multiple name matches":exact.length===1?" · suggested match — review":" · no exact match"}</small></span><select data-import-profile="${source.id}">${opts}</select></label>`;
     }).join("")||'<p class="muted">No household profiles in this backup.</p>';
-    $("confirmImportPreview").disabled=true;
-    $("confirmImportPreview").textContent=errors.length?"Fix backup before importing":"Import (database step pending)";
-    pendingBackup=backup;
+    $("confirmImportPreview").disabled=errors.length>0;
+    pendingBackup=errors.length?null:backup;
+    updateImportModeNotice();
   }
   $("importData").onclick=()=>$("importFile").click();
   $("importFile").addEventListener("change",async e=>{
@@ -769,8 +776,34 @@ function setup() {
     try {const backup=JSON.parse(await file.text());renderImportPreview(backup);$("importPreviewDialog").showModal();}
     catch(error){alert("Could not read this JSON backup: "+error.message);}
   });
+  $("importMode").addEventListener("change",updateImportModeNotice);
   $("closeImportPreview").onclick=()=>$("importPreviewDialog").close();
   $("cancelImportPreview").onclick=()=>$("importPreviewDialog").close();
+  $("confirmImportPreview").onclick=async()=>{
+    if(!pendingBackup)return;
+    const mode=$("importMode").value;
+    const confirmMessage=mode==="replace"
+      ?"This will replace the household's portable content. Existing profiles, account links, memberships, permissions, and workspace identity are retained. A pre-import snapshot will be recorded. Continue?"
+      :"This will merge the backup into the current household. Existing records will not be overwritten. Continue?";
+    if(!await askWIWYConfirm(mode==="replace"?"Replace household content?":"Merge household data?",confirmMessage,mode==="replace"?"Replace household":"Merge data"))return;
+    const button=$("confirmImportPreview");
+    const mapping={};
+    document.querySelectorAll("[data-import-profile]").forEach(select=>{if(select.value)mapping[select.dataset.importProfile]=select.value;});
+    button.disabled=true;
+    button.textContent="Importing household data…";
+    try{
+      const result=await Cloud.importHouseholdBackup(pendingBackup,mode,mapping);
+      $("importPreviewDialog").close();
+      pendingBackup=null;
+      render();
+      const counts=Object.entries(result.counts||{}).map(([key,value])=>`${collectionLabels[key]||key}: ${value}`).join(" · ");
+      toast((result.message||"Household import completed.")+(counts?" "+counts:""));
+    }catch(error){
+      toast("Import failed; the database transaction was rolled back. "+error.message);
+      button.disabled=false;
+      updateImportModeNotice();
+    }
+  };
 
   $("awayButton").onclick=()=>{populatePeopleSelects();$("awayPersonWrap").hidden=true;$("awayScope").onchange=()=>{$("awayPersonWrap").hidden=$("awayScope").value!=="person";};$("awayDialog").showModal();};
   $("closeAwayDialog").onclick=()=>$("awayDialog").close();
