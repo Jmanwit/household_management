@@ -486,3 +486,50 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
   .observance-individual-list{grid-template-columns:1fr}
   .month-observance-label{max-width:100%;font-size:7px}
 }
+
+/* WIWY 0.9.6 — user-controlled updates, calendar settings and household roles */
+.page-heading{
+  background:linear-gradient(145deg,#fffaf0 0%,#f2ead9 100%)!important;
+  border:1px solid #d8c9aa!important;border-radius:15px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 5px 13px rgba(8,25,14,.15)!important;
+}
+.page-heading .date-stack{color:#84755e!important}
+.page-heading .date-stack strong{color:#44372a!important}
+.page-heading h1{color:#44372a!important}
+.wiwy-update-banner{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:12px 16px;margin:0 0 14px;border:1px solid rgba(230,201,142,.65);
+  border-radius:13px;background:linear-gradient(110deg,#173d2b,#2d6043 60%,#214a34);
+  color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 5px 15px rgba(10,30,17,.2)
+}
+.wiwy-update-banner[hidden]{display:none}
+.wiwy-update-banner div{display:grid;gap:3px}
+.wiwy-update-banner strong{font-size:12px;letter-spacing:.09em;color:#e5c98f}
+.wiwy-update-banner span{font-size:12px;color:#fff8e8}
+.wiwy-update-banner button{flex:0 0 auto;border:1px solid #d9c18d;border-radius:9px;padding:9px 12px;background:#fff8e8;color:#314332;font-weight:800}
+.calendar-settings-panel{margin-top:14px;padding:15px 18px}
+.calendar-settings-panel>summary{cursor:pointer;font-weight:800;color:var(--text);list-style:none}
+.calendar-settings-panel>summary:after{content:"＋";float:right;color:var(--gold)}
+.calendar-settings-panel[open]>summary:after{content:"−"}
+.calendar-settings-panel .observance-settings{padding-top:15px}
+.custom-observance-editor{border-top:1px solid var(--line);padding-top:14px;margin-top:12px}
+.custom-observance-editor h4{margin:0 0 10px;font-size:13px}
+.custom-observance-form{display:grid;grid-template-columns:1.3fr 1fr auto auto;align-items:center;gap:8px}
+.custom-observance-form input[type=text],.custom-observance-form input[type=date],.role-control select{min-width:0;border:1px solid var(--line);border-radius:9px;padding:9px;background:var(--surface);color:var(--text);font:inherit}
+.custom-observance-form label{display:flex!important;flex-direction:row;align-items:center;gap:6px!important;white-space:nowrap}
+.custom-observance-form input[type=checkbox]{width:16px;height:16px;accent-color:#315b43}
+.custom-observance-list{display:grid;gap:6px;margin-top:10px}
+.custom-observance-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12px}
+.role-control{display:grid!important;gap:4px!important;font-size:10px!important;color:var(--muted)!important}
+.role-control select{font-size:12px}
+.member-admin-panel{margin-top:16px;padding:18px}
+.member-admin-panel .small-note{font-size:12px;line-height:1.5}
+.update-settings-card .version{margin:8px 0;color:var(--muted);font-size:12px}
+@media(max-width:640px){
+ .wiwy-update-banner{align-items:flex-start;flex-direction:column}
+ .wiwy-update-banner button{width:100%}
+ .custom-observance-form{grid-template-columns:1fr 1fr}
+ .custom-observance-form button{grid-column:1/-1}
+}
+
+#memberAdminPanel[hidden]{display:none}
