@@ -1,4 +1,4 @@
-const CACHE = "wiwy-shell-v24";
+const CACHE = "wiwy-shell-v25";
 const CORE = [
   "./", "./index.html", "./css/app.css",
   "./js/app.js", "./js/cloud.js", "./js/auth.js", "./js/store.js", "./js/config.js",

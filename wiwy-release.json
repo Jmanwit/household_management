@@ -1,5 +1,5 @@
 {
-  "version": "0.9.7",
+  "version": "0.9.8",
   "released": "2026-11-11",
-  "notes": "Improved user-approved application updates and cache isolation; invitation roles now use a descriptive dropdown. No email-provider dependency or database migration required."
+  "notes": "Visual refresh aligned with the Shack Out Back design language: warm ivory surfaces, forest-green structure, restrained brass accents, and updated typography. No database migration."
 }
