@@ -439,7 +439,7 @@ function render() {
 }
 
 // WIWY 0.9.6 — user-controlled application updates.
-const WIWY_VERSION="0.9.8";
+const WIWY_VERSION="0.10.1";
 let wiwyRegistration=null;
 let updateInstallInProgress=false;
 function showUpdateBanner(version,notes=""){
@@ -465,8 +465,10 @@ async function checkForWIWYUpdate(manual=false){
     if(wiwyRegistration.waiting){
       $("installUpdateButton").hidden=false;
       if(status)status.textContent=`Version ${release.version} is downloaded and waiting for your approval.`;
+    }else if(newer && wiwyRegistration.installing){
+      if(status)status.textContent="The update is downloading. Keep WIWY open briefly; the Install update button will appear when the files are ready.";
     }else if(newer){
-      if(status)status.textContent="Update found. WIWY is preparing the new application files; check again shortly.";
+      if(status)status.textContent="A newer release is published, but the browser has not installed its service worker yet. Check again shortly; your current household data is untouched.";
     }else if(status)status.textContent="WIWY is up to date.";
     if(!newer&&!wiwyRegistration.waiting)hideUpdateBanner();
   }catch(error){if(status)status.textContent=error.message;if(manual)toast("Update check: "+error.message);}
