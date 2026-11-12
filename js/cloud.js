@@ -82,6 +82,14 @@ export async function saveReminderRule(ruleId, patch) {
   await refresh();
   document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
 }
+export async function deleteReminderRule(ruleId) {
+  if (!client || !workspace) throw new Error("WIWY cloud connection is not initialized.");
+  if (!(isAdmin() || membership?.role === "Manager")) throw new Error("Only a household Admin or Manager can delete reminder rules.");
+  const { error } = await client.from("wiwy_reminder_rules").delete().eq("id",ruleId).eq("workspace_id",workspace.id);
+  if (error) throw error;
+  await refresh();
+  document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
+}
 export async function markNotificationRead(id) {
   const { error } = await client.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id);
   if (error) throw error;

@@ -114,6 +114,7 @@ async function openTaskDetails(task, date=keyDate()) {
     ${steps}
     <section class="detail-section"><h3>Status</h3><p id="taskDetailStatus">${status}${done&&occurrence?.completedByProfileId?" · Completed by "+esc(personName(occurrence.completedByProfileId)):""}</p></section>
     <div class="detail-actions">
+      ${canEdit?`<button class="secondary-button" data-detail-edit="${task.id}">Edit task</button>`:""}
       ${done&&canEdit?`<button class="secondary-button" data-detail-reopen="${task.id}">Reopen task</button>`:!done&&canComplete?`<button class="primary-button" data-detail-complete="${task.id}">Mark task complete</button>`:""}
     </div>`;
   $("taskDetailDialog").dataset.taskId=task.id;
@@ -164,7 +165,7 @@ function renderTasks() {
     const canEdit=Cloud.canManageTask(t), canComplete=Cloud.canCompleteTask(t);
     const steps=(t.operations||[]).map(o=>`<label class="task-step ${o.completed?"step-done":""}"><input type="checkbox" data-step-task="${t.id}" data-step-id="${o.id}" ${o.completed?"checked":""} ${!canComplete||done?"disabled":""}><span>${esc(o.name)}</span></label>`).join("");
     const required=(t.operations||[]).filter(o=>o.required), allStepsDone=required.length>0&&required.every(o=>o.completed);
-    return `<article class="task-card ${done?"task-card-done":""}"><div class="task-row"><button class="task-check ${done?"checked":""}" data-complete="${t.id}" ${!canComplete||done?"disabled":""} aria-label="Complete task">${done?"✓":""}</button><div class="task-main"><div class="task-title">${esc(t.name)}</div><div class="task-detail">${esc(names)} · ${repeatText(t)} · ${(t.operations||[]).length} steps${done?" · Completed"+(occ?.completedByProfileId?" by "+esc(personName(occ.completedByProfileId)):""):""}</div></div><div class="task-time">${timeText(t.start)}</div>${done&&canEdit?`<button class="reopen-task" data-reopen-task="${t.id}">Reopen</button>`:canEdit?`<button class="task-edit" data-edit-task="${t.id}" aria-label="Edit task">⋯</button>`:""}</div>${steps?`<div class="task-steps">${steps}</div>${allStepsDone&&!done?`<p class="steps-hint">All required steps are complete. The task will finish automatically.</p>`:""}`:""}</article>`;
+    return `<article class="task-card ${done?"task-card-done":""}"><div class="task-row"><button class="task-check ${done?"checked":""}" data-complete="${t.id}" ${!canComplete||done?"disabled":""} aria-label="Complete task">${done?"✓":""}</button><div class="task-main"><div class="task-title">${esc(t.name)}</div><div class="task-detail">${esc(names)} · ${repeatText(t)} · ${(t.operations||[]).length} steps${done?" · Completed"+(occ?.completedByProfileId?" by "+esc(personName(occ.completedByProfileId)):""):""}</div></div><div class="task-time">${timeText(t.start)}</div>${canEdit?`<button class="task-edit" data-edit-task="${t.id}" aria-label="Edit task">Edit</button>`:""}${done&&canEdit?`<button class="reopen-task" data-reopen-task="${t.id}">Reopen</button>`:""}</div>${steps?`<div class="task-steps">${steps}</div>${allStepsDone&&!done?`<p class="steps-hint">All required steps are complete. The task will finish automatically.</p>`:""}`:""}</article>`;
   }).join(""):empty("No tasks here yet","Add a task to begin building your household routine.");
 }
 function repeatText(t) { return t.repeat==="daily"?"Daily":t.repeat==="weekdays"?(t.weekdays||[]).map(x=>shortDays[x]).join(", "):"One time"; }
@@ -243,8 +244,8 @@ function saveObservancePrefs(prefs){
   Cloud.saveHouseholdSettings({observance_preferences:prefs}).catch(error=>{console.error(error);toast("Calendar preferences could not be saved to the household cloud.");});
 }
 function customObservances(){return Cloud.getHouseholdSettings()?.custom_observances||[];}
-function saveCustomObservances(items){
-  Cloud.saveHouseholdSettings({custom_observances:items}).catch(error=>{console.error(error);toast("Custom observances could not be saved to the household cloud.");});
+async function saveCustomObservances(items){
+  await Cloud.saveHouseholdSettings({custom_observances:items});
 }
 function nthWeekday(year,month,weekday,n){
   const first=new Date(year,month,1,12);
@@ -368,7 +369,7 @@ function renderObservanceSettings(){
       <button type="button" class="secondary-button" id="addCustomObservance">Add observance</button>
     </div>
     <div class="custom-observance-list">${customObservances().map(o=>`<div class="custom-observance-row"><span>${esc(o.title)} · ${esc(o.date)}${o.annual?" · annual":""}</span><button type="button" class="text-button danger-button" data-delete-observance="${esc(o.id)}">Remove</button></div>`).join("")||'<p class="muted tiny">No custom observances added.</p>'}</div>
-  </div><div class="custom-observance-editor"><h4>Family reminder rules</h4><p class="muted tiny">Advance notices are generated centrally and sent through WIWY push notifications. Leave recipients empty to notify every linked household account.</p>${(Cloud.getHouseholdSettings().reminder_rules||[]).map(r=>{const label=({birthday:"Birthdays",anniversary:"Wedding anniversary",mothers_day:"Mother's Day",valentines_day:"Valentine's Day",custom:"Custom observance"})[r.event_type]||r.event_key;return `<div class="custom-observance-row reminder-rule-row"><div><strong>${esc(label)}</strong><small>${esc(r.event_key)}</small></div><label>Days before <input type="text" inputmode="numeric" data-rule-days="${esc(r.id)}" value="${(r.offsets_minutes||[]).map(n=>Math.round(n/1440)).join(", ")}" aria-label="Reminder days before"></label><label>Notification note <input type="text" data-rule-note="${esc(r.id)}" value="${esc(r.note||"")}" maxlength="120"></label><label>Recipients <select multiple data-rule-recipients="${esc(r.id)}" aria-label="Reminder recipients">${(Cloud.getState().people||[]).map(person=>`<option value="${esc(person.id)}" ${(r.recipient_profile_ids||[]).includes(person.id)?"selected":""}>${esc(person.name)}</option>`).join("")}</select><small>None selected = all linked household members</small></label><button type="button" class="secondary-button" data-save-rule="${esc(r.id)}">Save rule</button></div>`;}).join("")||'<p class="muted tiny">No reminder rules configured.</p>'}</div><p class="muted tiny">Birthday entries are generated from each member's saved birth date. Advance alerts are delivered by the household reminder service.</p>`;
+  </div><div class="custom-observance-editor"><h4>Family reminder rules</h4><p class="muted tiny">Advance notices are generated centrally and sent through WIWY push notifications. Leave recipients empty to notify every linked household account.</p>${(Cloud.getHouseholdSettings().reminder_rules||[]).map(r=>{const label=({birthday:"Birthdays",anniversary:"Wedding anniversary",mothers_day:"Mother's Day",valentines_day:"Valentine's Day",custom:"Custom observance"})[r.event_type]||r.event_key;return `<div class="custom-observance-row reminder-rule-row"><div><strong>${esc(label)}</strong><small>${esc(r.event_key)}</small></div><label>Days before <input type="text" inputmode="numeric" data-rule-days="${esc(r.id)}" value="${(r.offsets_minutes||[]).map(n=>Math.round(n/1440)).join(", ")}" aria-label="Reminder days before"></label><label>Notification note <input type="text" data-rule-note="${esc(r.id)}" value="${esc(r.note||"")}" maxlength="120"></label><label>Recipients <select multiple data-rule-recipients="${esc(r.id)}" aria-label="Reminder recipients">${(Cloud.getState().people||[]).map(person=>`<option value="${esc(person.id)}" ${(r.recipient_profile_ids||[]).includes(person.id)?"selected":""}>${esc(person.name)}</option>`).join("")}</select><small>None selected = all linked household members</small></label><div class="button-row"><button type="button" class="secondary-button" data-save-rule="${esc(r.id)}">Save rule</button><button type="button" class="text-button danger-button" data-delete-rule="${esc(r.id)}">Delete rule</button></div></div>`;}).join("")||'<p class="muted tiny">No reminder rules configured.</p>'}</div><p class="muted tiny">Birthday entries are generated from each member's saved birth date. Advance alerts are delivered by the household reminder service.</p>`;
 }
 function checkPersonalDateAlerts(){ /* Family-date alerts are generated server-side and delivered through the existing push dispatcher. */ }
 
@@ -420,7 +421,8 @@ function render() {
   const visibleWorkspaceName = authenticatedWorkspace?.name || Store.getState().workspace.name;
   $("workspaceName").textContent = visibleWorkspaceName;
   $("settingsWorkspace").value = visibleWorkspaceName;
-  renderToday();renderTasks();renderMeals();renderGroceries();renderPeople();renderLedger();renderCalendar();renderObservanceSettings();
+  const preserveObservanceDraft=$("observanceSettings").contains(document.activeElement);
+  renderToday();renderTasks();renderMeals();renderGroceries();renderPeople();renderLedger();renderCalendar();if(!preserveObservanceDraft)renderObservanceSettings();
   const away=Cloud.getAwayPeriods();
   $("awayButton").innerHTML=away.length?`<img src="./icons/away-suitcase.svg" alt="" class="away-suitcase-icon"> <span class="desktop-only">Away mode on</span>`:`<img src="./icons/away-suitcase.svg" alt="" class="away-suitcase-icon"> <span class="desktop-only">Away mode</span>`;
   const unreadNotifications=Cloud.getNotifications().filter(n=>!n.read_at).length;
@@ -606,6 +608,12 @@ async function enablePushNotifications() {
 }
 
 
+
+async function restorePushRegistrationState(){
+  const button=$("enablePushButton");if(!button||!("Notification" in window)||Notification.permission!=="granted"||!("serviceWorker" in navigator))return;
+  try{const reg=await navigator.serviceWorker.getRegistration("./");const sub=await reg?.pushManager?.getSubscription();if(!sub)return;const authClient=window.WIWY_AUTH?.client;if(!authClient)return;const {data,error}=await authClient.from("push_subscriptions").select("endpoint").eq("endpoint",sub.endpoint).maybeSingle();if(error)throw error;if(data){button.textContent="Push notifications enabled";button.disabled=false;}else{button.textContent="Finish push registration";button.disabled=false;}}catch(error){console.warn("WIWY push status check:",error);button.textContent="Check push registration";button.disabled=false;}
+}
+
 // Capture push-button taps at the document level rather than relying on a
 // direct onclick property. This listener is installed before authenticated
 // startup, so unrelated setup/rendering code cannot prevent the button binding.
@@ -723,9 +731,9 @@ function openTask(task=null) {
       return;
     }
     const confirmed=await askWIWYConfirm(
-      "Discard task changes?",
-      "Are you sure you want to cancel task creation? Your unsaved information will be lost.",
-      "Discard task"
+      "Discard changes?",
+      "Your unsaved changes will be lost.",
+      "Discard changes"
     );
     if(confirmed)$("taskDialog").close();
   };
@@ -735,15 +743,20 @@ function renderOperations() {
   $("operationEditor").innerHTML=operations.map((o,i)=>`<div class="operation-row"><input type="checkbox" ${o.required===false?"":"checked"} data-op-required="${i}" style="width:16px"><input type="text" value="${esc(o.name)}" data-op-name="${i}"><button type="button" class="op-remove" data-op-remove="${i}">×</button></div>`).join("");
 }
 function renderWeekdays() { document.querySelectorAll("[data-day]").forEach(b=>b.classList.toggle("selected",selectedDays.has(Number(b.dataset.day)))); }
+let taskSaveInProgress=false;
 async function saveTaskFromForm() {
+  if(taskSaveInProgress)return false;
   const id=$("taskId").value, repeat=$("taskRepeat").value;
   const existingTask=id?Cloud.getState().tasks.find(t=>t.id===id):null;
   if(repeat==="weekdays"&&!selectedDays.size){toast("Choose at least one weekday.");return false;}
   const task={id:id||undefined,name:$("taskName").value.trim(),assigneeIds:[...document.querySelectorAll("[data-assignee-option]:checked")].map(o=>o.value),repeat,weekdays:repeat==="weekdays"?[...selectedDays]:[],date:repeat==="once"?(existingTask?.date||keyDate()):null,start:$("taskStart").value||null,end:$("taskEnd").value||null,operations,notes:$("taskNotes").value.trim(),advanceReminderOffsets:selectedReminderOffsets(),completionPushEnabled:$("completionPushEnabled").checked,linkedMealId:existingTask?.linkedMealId||null};
   if(!task.name)return false;
   const errorBox=$("taskFormError");errorBox.hidden=true;errorBox.textContent="";
-  try { await Cloud.saveTask(task); $("taskDialog").close(); render(); toast("✓ Task created and saved to your household."); return true; }
-  catch(error) { errorBox.textContent="Could not save task: "+error.message; errorBox.hidden=false; return false; }
+  const submit=$("taskEditor").querySelector('[type="submit"]');
+  taskSaveInProgress=true;if(submit)submit.disabled=true;toast("Creation In Progress");
+  try { await Cloud.saveTask(task); $("taskDialog").close(); render(); toast(id?"Task Updated!":"Task Created!"); return true; }
+  catch(error) { errorBox.textContent="Could not save task: "+error.message; errorBox.hidden=false; toast("Task could not be saved."); return false; }
+  finally {taskSaveInProgress=false;if(submit)submit.disabled=false;}
 }
 let mealTaskDrafts=[];
 function renderMealTaskDrafts() {
@@ -770,6 +783,7 @@ async function submitMealEditor() {
   const meal={id,date:$("mealDate").value,type:$("mealType").value,name:$("mealName").value.trim(),notes:$("mealNotes").value.trim()};
   if(!meal.date||!meal.name){toast("Choose a date and enter a meal name.");return;}
   const taskDrafts=mealTaskDrafts.map((t,i)=>({name:document.querySelector(`[data-meal-task-name="${i}"]`)?.value.trim()||"",assigneeId:document.querySelector(`[data-meal-task-assignee="${i}"]`)?.value||"",date:document.querySelector(`[data-meal-task-date="${i}"]`)?.value||meal.date,time:document.querySelector(`[data-meal-task-time="${i}"]`)?.value||""})).filter(t=>t.name);
+  const mealSubmit=$("mealEditor").querySelector('[type="submit"]');if(mealSubmit)mealSubmit.disabled=true;toast("Creation In Progress");
   try {
     const mealId=await Cloud.saveMeal(meal);
     let made=0,failed=[];
@@ -782,9 +796,10 @@ async function submitMealEditor() {
       } catch(error){failed.push(`${task.name}: ${error.message}`);}
     }
     $("mealDialog").close();render();
-    toast(failed.length?`Meal saved; ${made} task(s) created. ${failed[0]}`:`Meal saved${made?` with ${made} preparation task(s)`:""}.`);
+    toast(failed.length?`Meal saved; ${made} task(s) created. ${failed[0]}`:`Meal Created${made?` with ${made} preparation task(s)`:"!"}`);
     if(failed.length>1)console.warn("Additional WIWY meal preparation task errors:",failed.slice(1));
   } catch(error){toast("Could not save meal: "+error.message);}
+  finally{if(mealSubmit)mealSubmit.disabled=false;}
 }
 
 function setup() {
@@ -802,11 +817,14 @@ function setup() {
     if(taskId&&operationId){const date=e.target.dataset.detailStepDate||detailDateKey;try{await Cloud.setOperationCompletion(taskId,date,operationId,e.target.checked);render();await openTaskDetails(Cloud.getState().tasks.find(t=>t.id===taskId),date);const t=Cloud.getState().tasks.find(x=>x.id===taskId);if(t?.occurrences?.[date]?.status==="completed")toast("✓ All required steps completed. Task finished.");}catch(error){e.target.checked=!e.target.checked;toast("Could not update step: "+error.message);}}
   });
   $("taskDetailContent").addEventListener("click",async e=>{
+    const edit=e.target.closest("[data-detail-edit]"); if(edit){const task=Cloud.getState().tasks.find(t=>t.id===edit.dataset.detailEdit);if(task){$("taskDetailDialog").close();openTask(task);}return;}
     const complete=e.target.closest("[data-detail-complete]"); if(complete)await completeTaskFromDetails(complete.dataset.detailComplete);
     const reopen=e.target.closest("[data-detail-reopen]"); if(reopen&&await askWIWYConfirm("Reopen task?","This will clear the completed steps and return the task to not started.","Reopen task")){try{await Cloud.reopenTask(reopen.dataset.detailReopen,detailDateKey);render();await openTaskDetails(Cloud.getState().tasks.find(t=>t.id===reopen.dataset.detailReopen),detailDateKey);toast("Task reopened.");}catch(error){toast("Could not reopen task: "+error.message);}}
   });
   $("closeTaskDetail").onclick=()=>$("taskDetailDialog").close();
   $("pageBack").onclick=goBack;
+  const homeBrand=document.querySelector(".header-brand-row");
+  if(homeBrand){homeBrand.style.cursor="pointer";homeBrand.setAttribute("role","button");homeBrand.setAttribute("tabindex","0");const goHome=()=>{viewHistory=[];calendarDate=new Date();calendarDate.setHours(12,0,0,0);calendarMode="day";calendarReturnToMonth=false;setView("today");};homeBrand.addEventListener("click",e=>{if(e.target.closest("#profileButton")||e.target.closest("#accountMenu"))return;goHome();});homeBrand.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest("#profileButton")){e.preventDefault();goHome();}});}
   const launchTaskEditor = (event) => { event?.preventDefault(); event?.stopPropagation(); try { openTask(); } catch(error) { console.error("Could not open task editor:", error); toast("Could not open the task editor: " + error.message); } };
   $("quickAddTask").addEventListener("click", launchTaskEditor);
   $("newTaskButton").addEventListener("click", launchTaskEditor);
@@ -1160,17 +1178,19 @@ function setup() {
       $("profileButton").setAttribute("aria-expanded", "false");
     }
   });
-  $("observanceSettings").addEventListener("click",e=>{
+  $("observanceSettings").addEventListener("click",async e=>{
     const remove=e.target.closest("[data-delete-observance]");
-    if(remove){saveCustomObservances(customObservances().filter(o=>o.id!==remove.dataset.deleteObservance));renderObservanceSettings();renderCalendar();}
+    if(remove){if(!await askWIWYConfirm("Delete observance?","This removes the custom observance and its future reminders. Existing notification history will remain.","Delete observance"))return;try{toast("Saving Changes…");await saveCustomObservances(customObservances().filter(o=>o.id!==remove.dataset.deleteObservance));renderObservanceSettings();renderCalendar();toast("Observance Deleted!");}catch(error){toast("Could not delete observance: "+error.message);}return;}
     if(e.target.closest("#addCustomObservance")){
       const title=$("customObservanceTitle").value.trim(),date=$("customObservanceDate").value,annual=$("customObservanceAnnual").checked;
       if(!title||!date){toast("Enter an observance name and date.");return;}
       const items=customObservances();items.push({id:"custom-"+crypto.randomUUID(),title,date,annual,category:"custom"});
-      saveCustomObservances(items);renderObservanceSettings();renderCalendar();toast("Saving custom observance to household cloud…");
+      const add=e.target.closest("#addCustomObservance");if(add)add.disabled=true;toast("Creation In Progress");
+      try{await saveCustomObservances(items);renderObservanceSettings();renderCalendar();toast("Observance Created!");}catch(error){toast("Could not save observance: "+error.message);}finally{if(add)add.disabled=false;}
     }
   });
   $("observanceSettings").addEventListener("click",async e=>{
+    const remove=e.target.closest("[data-delete-rule]");if(remove){if(!await askWIWYConfirm("Delete reminder rule?","Future reminders from this rule will stop. Previously generated notifications will remain in your history.","Delete rule"))return;try{await Cloud.deleteReminderRule(remove.dataset.deleteRule);renderObservanceSettings();toast("Reminder rule deleted.");}catch(error){toast("Could not delete reminder rule: "+error.message);}return;}
     const save=e.target.closest("[data-save-rule]"); if(!save)return;
     const id=save.dataset.saveRule, daysInput=document.querySelector(`[data-rule-days="${id}"]`), noteInput=document.querySelector(`[data-rule-note="${id}"]`), recipientsInput=document.querySelector(`[data-rule-recipients="${id}"]`);
     const days=daysInput.value.split(",").map(v=>Number(v.trim())).filter(v=>Number.isInteger(v)&&v>0&&v<=30);
@@ -1207,6 +1227,7 @@ function setup() {
       avatar.setAttribute("aria-expanded", "false");
     }
     setup();
+    restorePushRegistrationState();
     setupWIWYUpdates();
     checkPersonalDateAlerts();
     window.setInterval(checkPersonalDateAlerts, 60*60*1000);
