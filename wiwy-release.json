@@ -1,5 +1,5 @@
 {
-  "version": "0.10.2",
+  "version": "0.10.3",
   "released": "2026-11-12",
-  "notes": "Household settings, reminder management, task editing, navigation, and save feedback corrections."
+  "notes": "Update installation reliability, streamlined date headings, and a cleaner Today home header."
 }

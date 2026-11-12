@@ -1,6 +1,6 @@
-const CACHE = "wiwy-shell-v28";
+const CACHE = "wiwy-shell-v29";
 const CORE = [
-  "./", "./index.html", "./css/app.css",
+  "./index.html", "./css/app.css",
   "./js/app.js", "./js/cloud.js", "./js/auth.js", "./js/store.js", "./js/config.js",
   "./wiwy-release.json"
 ];
@@ -11,9 +11,22 @@ const OPTIONAL = [
 
 self.addEventListener("install", event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
-  // addAll is intentionally atomic: don't install a partial application shell.
-  await cache.addAll(CORE);
-  await Promise.allSettled(OPTIONAL.map(path => cache.add(path)));
+  // Fetch required shell files individually. This avoids addAll's opaque failure
+  // behavior and reports the exact asset that prevents installation.
+  for (const path of CORE) {
+    const url = new URL(path, self.registration.scope);
+    const response = await fetch(url, { cache: "reload" });
+    if (!response.ok || response.type === "opaque") {
+      throw new Error(`WIWY update could not download ${url.pathname} (${response.status}).`);
+    }
+    await cache.put(url, response.clone());
+  }
+  // Nonessential icons/manifest must never block an application update.
+  await Promise.allSettled(OPTIONAL.map(async path => {
+    const url = new URL(path, self.registration.scope);
+    const response = await fetch(url, { cache: "reload" });
+    if (response.ok && response.type !== "opaque") await cache.put(url, response);
+  }));
   // Do not skip waiting automatically. WIWY asks the user before activation.
 })()));
 
