@@ -1,5 +1,5 @@
 {
-  "version": "0.10.3",
+  "version": "0.10.5",
   "released": "2026-11-12",
-  "notes": "Update installation reliability, streamlined date headings, and a cleaner Today home header."
+  "notes": "Fix Today heading state fallback and apply consistent forest-green/brass header and button styling."
 }
