@@ -70,7 +70,7 @@ function setView(view, fromBack=false) {
   currentView=view;
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`view-${view}`));
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-  $("pageTitle").textContent={today:"Today",calendar:"Calendar",tasks:"Tasks",meals:"Meals",groceries:"Groceries",people:"People",ledger:"Activity",settings:"Settings"}[view]||"Today";
+  $("pageTitle").textContent={today:"",calendar:"Calendar",tasks:"Tasks",meals:"Meals",groceries:"Groceries",people:"People",ledger:"Activity",settings:"Settings"}[view]||"Today";
   $("pageBack").hidden = view === "today";
   closeSidebar();
   render();
@@ -441,7 +441,7 @@ function render() {
 }
 
 // WIWY 0.9.6 — user-controlled application updates.
-const WIWY_VERSION="0.10.1";
+const WIWY_VERSION="0.10.3";
 let wiwyRegistration=null;
 let updateInstallInProgress=false;
 function showUpdateBanner(version,notes=""){
