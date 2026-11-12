@@ -1,5 +1,5 @@
 {
-  "version": "0.10.0",
+  "version": "0.10.1",
   "released": "2026-11-12",
-  "notes": "Combined header correction, household-synced observance preferences and custom dates, configurable server reminder rules, and portable settings backup support."
+  "notes": "Hotfix: corrects the internal installed-version marker and update status handling so WIWY no longer reports its own installed release as perpetually available."
 }
