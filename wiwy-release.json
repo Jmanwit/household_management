@@ -1,5 +1,5 @@
 {
-  "version": "0.10.5",
+  "version": "0.10.6",
   "released": "2026-11-12",
-  "notes": "Fix Today heading state fallback and apply consistent forest-green/brass header and button styling."
+  "notes": "Synchronize runtime version, preserve agenda/calendar card styling, and use transparent emblem artwork."
 }
