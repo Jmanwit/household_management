@@ -70,7 +70,7 @@ function setView(view, fromBack=false) {
   currentView=view;
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`view-${view}`));
   document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-  $("pageTitle").textContent={today:"",calendar:"Calendar",tasks:"Tasks",meals:"Meals",groceries:"Groceries",people:"People",ledger:"Activity",settings:"Settings"}[view]||"Today";
+  const pageTitles={today:"",calendar:"Calendar",tasks:"Tasks",meals:"Meals",groceries:"Groceries",people:"People",ledger:"Activity",settings:"Settings"}; $("pageTitle").textContent=pageTitles[view] ?? "Today";
   $("pageBack").hidden = view === "today";
   closeSidebar();
   render();
