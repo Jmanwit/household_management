@@ -652,3 +652,68 @@ input:focus,select:focus,textarea:focus,.add-inline input:focus{border-color:var
   .view{padding-top:18px}
   .summary-card{padding:14px}
 }
+
+
+/* WIWY 0.9.9 — prevent the page-title panel from covering header controls */
+.topbar .header-brand-row{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  padding-right:46px;
+  min-width:0;
+}
+.topbar .header-brand-row #profileButton{
+  position:absolute;
+  right:0;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  min-width:36px;
+  min-height:36px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border-radius:50%;
+}
+.topbar .header-brand-row #accountMenu{
+  position:absolute;
+  right:0;
+  top:calc(100% + 8px);
+}
+.topbar .header-controls-row{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+}
+.topbar .header-nav-controls{justify-content:flex-start}
+.topbar .header-controls-row .page-heading{
+  width:max-content;
+  max-width:100%;
+  min-width:0;
+  justify-self:center;
+  padding-left:clamp(8px,2vw,18px);
+  padding-right:clamp(8px,2vw,18px);
+}
+.topbar .header-controls-row .page-heading h1{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.topbar .header-controls-row .top-actions{
+  justify-content:flex-end;
+  gap:7px;
+}
+@media(max-width:650px){
+  .topbar .header-brand-row{padding-right:43px}
+  .topbar .header-controls-row{grid-template-columns:auto minmax(0,1fr) auto;gap:6px}
+  .topbar .header-controls-row .page-heading{padding:6px 8px;max-width:100%}
+  .topbar .header-controls-row .page-heading h1{font-size:clamp(17px,5vw,21px)}
+  .topbar .header-controls-row .top-actions{gap:5px}
+  .topbar .header-controls-row .top-actions .icon-button{width:34px;height:34px;min-width:34px;min-height:34px}
+}
+
+/* WIWY 0.10.0 shared reminder rule editor */
+.reminder-rule-row{align-items:flex-start;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line,rgba(70,65,50,.14))}.reminder-rule-row>div{min-width:130px;display:grid;gap:3px}.reminder-rule-row small{color:var(--muted,#777);font-size:.78rem}.reminder-rule-row label{display:grid;gap:4px;flex:1;min-width:130px;font-size:.8rem;color:var(--muted,#777)}.reminder-rule-row input{width:100%;min-width:0}
