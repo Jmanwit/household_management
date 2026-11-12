@@ -234,20 +234,18 @@ function formatMonth(date){return date.toLocaleDateString(undefined,{month:"long
 // WIWY 0.9.5 — recurring family and civic observances.
 // Preferences are local to this device; the observances themselves are generated
 // from dates and profile birth dates so they never become stale one-off events.
-const OBSERVANCE_PREF_KEY = "wiwy.observances.v1";
-const OBSERVANCE_DEFAULTS = {
-  federal:true, catholic:true, family:true, civic:true,
-  items:{}
-};
+const OBSERVANCE_DEFAULTS = { federal:true, catholic:true, family:true, civic:true, items:{} };
 function observancePrefs(){
-  try {
-    const saved=JSON.parse(localStorage.getItem(OBSERVANCE_PREF_KEY)||"{}");
-    return {...OBSERVANCE_DEFAULTS,...saved,items:{...(saved.items||{})}};
-  } catch { return {...OBSERVANCE_DEFAULTS,items:{}}; }
+  const cloud=Cloud.getHouseholdSettings()?.observance_preferences;
+  return {...OBSERVANCE_DEFAULTS,...(cloud||{}),items:{...(cloud?.items||{})}};
 }
-function saveObservancePrefs(prefs){ localStorage.setItem(OBSERVANCE_PREF_KEY,JSON.stringify(prefs)); }
-function customObservances(){try{return JSON.parse(localStorage.getItem("wiwy.custom-observances.v1")||"[]");}catch{return [];}}
-function saveCustomObservances(items){localStorage.setItem("wiwy.custom-observances.v1",JSON.stringify(items));}
+function saveObservancePrefs(prefs){
+  Cloud.saveHouseholdSettings({observance_preferences:prefs}).catch(error=>{console.error(error);toast("Calendar preferences could not be saved to the household cloud.");});
+}
+function customObservances(){return Cloud.getHouseholdSettings()?.custom_observances||[];}
+function saveCustomObservances(items){
+  Cloud.saveHouseholdSettings({custom_observances:items}).catch(error=>{console.error(error);toast("Custom observances could not be saved to the household cloud.");});
+}
 function nthWeekday(year,month,weekday,n){
   const first=new Date(year,month,1,12);
   return new Date(year,month,1+((weekday-first.getDay()+7)%7)+(n-1)*7,12);
@@ -338,7 +336,7 @@ function observancesForYear(year){
   add("mothers-day","Mother's Day",nthWeekday(year,4,0,2),"family",true,"Mother's Day reminder");
   add("fathers-day","Father's Day",nthWeekday(year,5,0,3),"family",false);
   // Common civic observances, displayed without advance alerts.
-  add("valentines","Valentine's Day",fixed(2,14),"civic");
+  add("valentines","Valentine's Day",fixed(2,14),"civic",true,"Valentine's Day reminder");
   add("st-patricks","St. Patrick's Day",fixed(3,17),"civic");
   add("halloween","Halloween",fixed(10,31),"civic");
   customObservances().forEach(o=>{if(o.annual){const [m,d]=o.date.slice(5).split("-").map(Number);add(o.id,o.title,fixed(m,d),o.category||"custom",false,"Custom annual observance");}else if(Number(o.date.slice(0,4))===year){add(o.id,o.title,new Date(o.date+"T12:00:00"),o.category||"custom",false,"Custom one-time observance");}});
@@ -370,33 +368,9 @@ function renderObservanceSettings(){
       <button type="button" class="secondary-button" id="addCustomObservance">Add observance</button>
     </div>
     <div class="custom-observance-list">${customObservances().map(o=>`<div class="custom-observance-row"><span>${esc(o.title)} · ${esc(o.date)}${o.annual?" · annual":""}</span><button type="button" class="text-button danger-button" data-delete-observance="${esc(o.id)}">Remove</button></div>`).join("")||'<p class="muted tiny">No custom observances added.</p>'}</div>
-  </div><p class="muted tiny">Birthday entries are generated from each member's saved birth date. Advance alerts apply only to birthdays, the August 4 anniversary, and Mother's Day.</p>`;
+  </div><div class="custom-observance-editor"><h4>Family reminder rules</h4><p class="muted tiny">Advance notices are generated centrally and sent through WIWY push notifications. Leave recipients empty to notify every linked household account.</p>${(Cloud.getHouseholdSettings().reminder_rules||[]).map(r=>{const label=({birthday:"Birthdays",anniversary:"Wedding anniversary",mothers_day:"Mother's Day",valentines_day:"Valentine's Day",custom:"Custom observance"})[r.event_type]||r.event_key;return `<div class="custom-observance-row reminder-rule-row"><div><strong>${esc(label)}</strong><small>${esc(r.event_key)}</small></div><label>Days before <input type="text" inputmode="numeric" data-rule-days="${esc(r.id)}" value="${(r.offsets_minutes||[]).map(n=>Math.round(n/1440)).join(", ")}" aria-label="Reminder days before"></label><label>Notification note <input type="text" data-rule-note="${esc(r.id)}" value="${esc(r.note||"")}" maxlength="120"></label><label>Recipients <select multiple data-rule-recipients="${esc(r.id)}" aria-label="Reminder recipients">${(Cloud.getState().people||[]).map(person=>`<option value="${esc(person.id)}" ${(r.recipient_profile_ids||[]).includes(person.id)?"selected":""}>${esc(person.name)}</option>`).join("")}</select><small>None selected = all linked household members</small></label><button type="button" class="secondary-button" data-save-rule="${esc(r.id)}">Save rule</button></div>`;}).join("")||'<p class="muted tiny">No reminder rules configured.</p>'}</div><p class="muted tiny">Birthday entries are generated from each member's saved birth date. Advance alerts are delivered by the household reminder service.</p>`;
 }
-function checkPersonalDateAlerts(){
-  const today=new Date(); today.setHours(12,0,0,0);
-  const targets=[addCalendarDays(today,7),addCalendarDays(today,1)];
-  const due=[];
-  targets.forEach((target,index)=>{
-    const offset=index===0?7:1;
-    observancesForDate(target).filter(o=>o.reminder).forEach(o=>due.push({...o,offset}));
-  });
-  if(!due.length)return;
-  const membership=Cloud.getMembership(), people=Cloud.getState().people||[];
-  const me=people.find(p=>p.id===membership?.member_profile_id);
-  if(!me||!/^Justin\b/i.test(me.name))return;
-  let seen={};try{seen=JSON.parse(localStorage.getItem("wiwy.personal-date-alerts.v1")||"{}");}catch{}
-  due.forEach(o=>{
-    const key=`${o.id}:${o.date}:${o.offset}`;
-    if(seen[key])return;
-    const message=`${o.title} is in ${o.offset} day${o.offset===1?"":"s"}.`;
-    toast(message);
-    if("Notification" in window && Notification.permission==="granted"){
-      try{new Notification("WIWY · Family reminder",{body:message,icon:"./icons/icon-192.png"});}catch{}
-    }
-    seen[key]=new Date().toISOString();
-  });
-  try{localStorage.setItem("wiwy.personal-date-alerts.v1",JSON.stringify(seen));}catch{}
-}
+function checkPersonalDateAlerts(){ /* Family-date alerts are generated server-side and delivered through the existing push dispatcher. */ }
 
 function tasksForDate(date){
   const key=keyDate(date);
@@ -1191,8 +1165,16 @@ function setup() {
       const title=$("customObservanceTitle").value.trim(),date=$("customObservanceDate").value,annual=$("customObservanceAnnual").checked;
       if(!title||!date){toast("Enter an observance name and date.");return;}
       const items=customObservances();items.push({id:"custom-"+crypto.randomUUID(),title,date,annual,category:"custom"});
-      saveCustomObservances(items);renderObservanceSettings();renderCalendar();toast("Custom observance added.");
+      saveCustomObservances(items);renderObservanceSettings();renderCalendar();toast("Saving custom observance to household cloud…");
     }
+  });
+  $("observanceSettings").addEventListener("click",async e=>{
+    const save=e.target.closest("[data-save-rule]"); if(!save)return;
+    const id=save.dataset.saveRule, daysInput=document.querySelector(`[data-rule-days="${id}"]`), noteInput=document.querySelector(`[data-rule-note="${id}"]`), recipientsInput=document.querySelector(`[data-rule-recipients="${id}"]`);
+    const days=daysInput.value.split(",").map(v=>Number(v.trim())).filter(v=>Number.isInteger(v)&&v>0&&v<=30);
+    if(!days.length){toast("Enter one or more reminder offsets in days (1–30). The rule was not changed.");return;}
+    try{await Cloud.saveReminderRule(id,{offsets_minutes:days.map(v=>v*1440),note:noteInput.value.trim(),recipient_profile_ids:Array.from(recipientsInput.selectedOptions).map(option=>option.value)});renderObservanceSettings();toast("Reminder rule saved to the household cloud.");}
+    catch(error){console.error(error);toast(error.message||"Could not save reminder rule.");}
   });
   $("observanceSettings").addEventListener("change",e=>{
     const prefs=observancePrefs(), target=e.target;

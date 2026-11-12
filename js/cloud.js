@@ -8,6 +8,7 @@ let activity = [];
 let awayPeriods = [];
 let notifications = [];
 let removalRequests = [];
+let householdSettings = { observance_preferences:{federal:true,catholic:true,family:true,civic:true,items:{}}, custom_observances:[], reminder_rules:[] };
 let permissions = new Set();
 let channel = null;
 let refreshBusy = false;
@@ -60,7 +61,27 @@ export function getState() { return structuredClone(state); }
 export function getActivity() { return structuredClone(activity); }
 export function getAwayPeriods() { return structuredClone(awayPeriods); }
 export function getNotifications() { return structuredClone(notifications); }
+export function getHouseholdSettings() { return structuredClone(householdSettings); }
+export async function saveHouseholdSettings(patch) {
+  if (!client || !workspace) throw new Error("WIWY cloud connection is not initialized.");
+  if (!(isAdmin() || membership?.role === "Manager")) throw new Error("Only a household Admin or Manager can change shared calendar settings.");
+  const next = { observance_preferences:patch.observance_preferences ?? householdSettings.observance_preferences, custom_observances:patch.custom_observances ?? householdSettings.custom_observances, workspace_id:workspace.id, updated_by:user?.id || null, updated_at:new Date().toISOString() };
+  const { data, error } = await client.from("wiwy_household_settings").upsert(next,{onConflict:"workspace_id"}).select("observance_preferences,custom_observances").single();
+  if (error) throw error;
+  householdSettings = { ...householdSettings, ...data };
+  document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
+  return getHouseholdSettings();
+}
 export function getRemovalRequests() { return structuredClone(removalRequests); }
+export async function saveReminderRule(ruleId, patch) {
+  if (!client || !workspace) throw new Error("WIWY cloud connection is not initialized.");
+  if (!(isAdmin() || membership?.role === "Manager")) throw new Error("Only a household Admin or Manager can change reminder rules.");
+  const allowed = { offsets_minutes:patch.offsets_minutes, note:patch.note, recipient_profile_ids:patch.recipient_profile_ids, enabled:patch.enabled };
+  const { error } = await client.from("wiwy_reminder_rules").update(allowed).eq("id",ruleId).eq("workspace_id",workspace.id);
+  if (error) throw error;
+  await refresh();
+  document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
+}
 export async function markNotificationRead(id) {
   const { error } = await client.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id);
   if (error) throw error;
@@ -126,6 +147,8 @@ export async function initialize(authClient, activeWorkspace, activeMembership, 
     .on("postgres_changes", { event:"*", schema:"public", table:"activity_ledger", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"away_periods", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .on("postgres_changes", { event:"*", schema:"public", table:"notifications", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"wiwy_household_settings", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
+    .on("postgres_changes", { event:"*", schema:"public", table:"wiwy_reminder_rules", filter:`workspace_id=eq.${workspace.id}` }, () => refreshQuietly())
     .subscribe();
   // Polling is a fallback if Realtime is not enabled for these tables.
   refreshTimer = setInterval(() => refreshQuietly(), 20000);
@@ -145,7 +168,7 @@ export async function refresh() {
     const requestQuery = (membership?.role === "Admin" || membership?.role === "Manager")
       ? client.from("profile_removal_requests").select("id,workspace_id,profile_id,requested_by,status,requested_at,reviewed_by,reviewed_at,review_note").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", {ascending:true})
       : Promise.resolve({ data: [], error: null });
-    const [peopleRes, taskRes, activityRes, awayRes, notificationRes, requestRes, mealsRes, groceriesRes, membershipsRes] = await Promise.all([
+    const [peopleRes, taskRes, activityRes, awayRes, notificationRes, requestRes, mealsRes, groceriesRes, membershipsRes, settingsRes, rulesRes] = await Promise.all([
       client.from("member_profiles").select("id,workspace_id,display_name,color,birth_date,is_active,created_at").eq("workspace_id", workspace.id).order("created_at"),
       client.from("tasks").select("id,workspace_id,name,assignee_profile_id,linked_meal_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at,advance_reminder_offsets,completion_push_enabled").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
       client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
@@ -154,9 +177,14 @@ export async function refresh() {
       requestQuery,
       client.from("meals").select("id,workspace_id,meal_date,meal_type,name,notes,recipe,created_by,created_at").eq("workspace_id", workspace.id).order("meal_date"),
       client.from("grocery_items").select("id,workspace_id,name,category,quantity,notes,is_completed,linked_meal_id,added_by,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:true}),
-      client.from("workspace_memberships").select("member_profile_id,user_id,role").eq("workspace_id", workspace.id)
+      client.from("workspace_memberships").select("member_profile_id,user_id,role").eq("workspace_id", workspace.id),
+      client.from("wiwy_household_settings").select("observance_preferences,custom_observances").eq("workspace_id",workspace.id).maybeSingle(),
+      client.from("wiwy_reminder_rules").select("id,event_type,event_key,offsets_minutes,note,recipient_profile_ids,enabled,created_at,updated_at").eq("workspace_id",workspace.id).order("created_at")
     ]);
     if (peopleRes.error) throw peopleRes.error;
+    if (settingsRes.error) throw settingsRes.error;
+    if (rulesRes.error) throw rulesRes.error;
+    householdSettings = { observance_preferences:{federal:true,catholic:true,family:true,civic:true,items:{}}, custom_observances:[], reminder_rules:[], ...(settingsRes.data||{}), reminder_rules:rulesRes.data||[] };
     if (taskRes.error) throw taskRes.error;
     if (activityRes.error) throw activityRes.error;
     if (awayRes.error) throw awayRes.error;
@@ -552,6 +580,9 @@ export async function exportHouseholdBackup() {
       data.schemaVersion !== 1 || !data.data) {
     throw new Error("The server returned an invalid WIWY backup.");
   }
+  const { data: settings, error: settingsError } = await client.rpc("wiwy_export_household_settings", { target_workspace:workspace.id });
+  if (settingsError) throw settingsError;
+  data.settings = settings || { observance_preferences:{}, custom_observances:[], reminder_rules:[] };
   return data;
 }
 
@@ -562,7 +593,7 @@ export async function importHouseholdBackup(backup, importMode, profileMapping =
   if (!client || !workspace) throw new Error("WIWY cloud connection is not initialized.");
   if (!user?.id) throw new Error("You must be signed in to import household data.");
   if (!["merge", "replace"].includes(importMode)) throw new Error("Choose Merge or Replace.");
-  const { data, error } = await client.rpc("wiwy_import_household_backup", {
+  const { data, error } = await client.rpc("wiwy_import_household_backup_v2", {
     target_workspace: workspace.id,
     backup,
     import_mode: importMode,
