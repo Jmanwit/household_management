@@ -444,12 +444,9 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
   filter:blur(2px);pointer-events:none;
 }
 .header-brand-row span{color:#e1c17c;text-shadow:0 1px 1px rgba(0,0,0,.28)}
-.header-controls-row .page-heading{padding:7px 15px 8px;border:1px solid rgba(231,215,174,.34);border-radius:13px;
-  background:linear-gradient(145deg,rgba(255,250,232,.14),rgba(255,255,255,.055));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 12px rgba(8,25,14,.12);
-}
+.header-controls-row .page-heading{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;}
 .header-controls-row .date-stack{color:#ead9b2;font-size:10px;letter-spacing:.09em}
-.header-controls-row .date-stack strong{font-size:12px;letter-spacing:.035em;color:#fff7e4;margin-top:2px}
+.header-controls-row .date-stack strong{font-size:clamp(15px,2vw,19px);letter-spacing:.015em;color:#fff7e4;margin-top:3px}
 .header-controls-row .page-heading h1{color:#fff8e8}
 .header-nav-controls .page-back,.header-nav-controls .mobile-menu,
 .top-actions .icon-button,.top-actions .avatar{
