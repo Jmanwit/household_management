@@ -1,5 +1,5 @@
 {
-  "version": "0.10.1",
+  "version": "0.10.2",
   "released": "2026-11-12",
-  "notes": "Hotfix: corrects the internal installed-version marker and update status handling so WIWY no longer reports its own installed release as perpetually available."
+  "notes": "Household settings, reminder management, task editing, navigation, and save feedback corrections."
 }
