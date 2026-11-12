@@ -1,5 +1,5 @@
 {
-  "version": "0.9.8",
-  "released": "2026-11-11",
-  "notes": "Visual refresh aligned with the Shack Out Back design language: warm ivory surfaces, forest-green structure, restrained brass accents, and updated typography. No database migration."
+  "version": "0.10.0",
+  "released": "2026-11-12",
+  "notes": "Combined header correction, household-synced observance preferences and custom dates, configurable server reminder rules, and portable settings backup support."
 }

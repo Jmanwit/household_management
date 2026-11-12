@@ -46,6 +46,8 @@
         <div class="header-brand-row" aria-label="Wherever I'm With You">
           <img src="./icons/wiwy-emblem.png" alt="House emblem">
           <span>Wherever I'm With You</span>
+          <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.7-4 3.2-6 7.5-6s6.8 2 7.5 6"/></svg></button>
+          <div id="accountMenu" class="account-menu" hidden><div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div><button type="button" data-account-action="account">Account settings</button><button type="button" data-account-action="household">Household settings</button><button type="button" data-account-action="signout">Sign out</button></div>
         </div>
         <div class="header-controls-row">
           <div class="header-nav-controls">
@@ -56,8 +58,7 @@
           <div class="top-actions">
             <button class="icon-button" id="awayButton" title="Away mode" aria-label="Away mode"><img src="./icons/away-suitcase.svg" alt="" class="away-suitcase-icon"></button>
             <button type="button" class="icon-button notification-button" id="notificationButton" title="Notifications" aria-label="Notifications"><svg class="notification-bell" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i></i></button>
-            <button class="avatar" id="profileButton" title="Account menu" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.7-4 3.2-6 7.5-6s6.8 2 7.5 6"/></svg></button>
-            <div id="accountMenu" class="account-menu" hidden><div class="account-menu-heading"><strong id="accountDisplayName">Your account</strong><span>Signed in to WIWY</span></div><button type="button" data-account-action="account">Account settings</button><button type="button" data-account-action="household">Household settings</button><button type="button" data-account-action="signout">Sign out</button></div>
+
           </div>
         </div>
       </header>
