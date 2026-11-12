@@ -537,3 +537,118 @@ button:disabled, input:disabled, select:disabled { opacity:.55; cursor:not-allow
 /* WIWY 0.9.7 household invitation dialog */
 #memberInviteDialog .small-note{margin:0 0 4px}
 #memberInviteRole{min-height:44px}
+
+
+/* WIWY 0.9.8 — Crooked Windmill shared visual language, aligned with Shack Out Back */
+:root{
+  color-scheme:light;
+  --bg:#f4f0e5;
+  --surface:#fffdf7;
+  --surface2:#f7f2e8;
+  --surface3:#eae3d2;
+  --line:#d9d0bf;
+  --text:#382a21;
+  --muted:#766659;
+  --green:#214536;
+  --green-dark:#173629;
+  --gold:#b28b4e;
+  --red:#963d32;
+  --yellow:#b28b4e;
+  --radius:13px;
+  font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+body{background:var(--bg);color:var(--text)}
+.sidebar{background:#214536;border-right:1px solid #183629;color:#fffdf7}
+.brand-mark{border:1px solid #c8ad7c;border-radius:50%;background:transparent;color:#ead6a7}
+.brand-name{color:#fffdf7;letter-spacing:.12em}
+.brand-subtitle{color:#d4c29f}
+.eyebrow,.summary-label{color:#9b7a43}
+.sidebar .eyebrow{color:#d4c29f}
+.workspace-button{background:rgba(255,253,247,.08);border-color:rgba(255,253,247,.25);color:#fffdf7;border-radius:9px}
+.workspace-dot{background:#d2b477}
+.nav-item{color:#e0e8e1;border-radius:8px}
+.nav-item:hover,.nav-item.active{background:rgba(255,253,247,.12);color:#fffdf7}
+.nav-item.active{box-shadow:inset 3px 0 #c8a66b}
+.nav-icon{color:#d2b477}
+.sidebar-note{border-color:rgba(255,253,247,.2);color:#d4c29f}
+.main-content{color:var(--text)}
+.topbar{
+  background:var(--green);color:#fffdf7;
+  border-bottom:3px solid var(--gold);
+  border-radius:0 0 13px 13px;
+  padding:14px 18px 15px;
+  margin:0 0 20px;
+  gap:12px;
+}
+.header-brand-row{justify-content:flex-start;text-align:left;min-height:48px;gap:11px}
+.header-brand-row img{width:43px;height:43px;flex:0 0 43px}
+.header-brand-row span{color:#ead6a7;font-size:clamp(19px,2.4vw,25px);font-weight:600}
+.header-controls-row{grid-template-columns:minmax(38px,.6fr) minmax(100px,1fr) auto}
+.page-heading{color:#fffdf7}
+.page-heading .eyebrow{color:#d4c29f}
+.topbar h1{color:#fffdf7}
+.header-nav-controls .page-back,.header-nav-controls .mobile-menu,
+.icon-button,.avatar,.mobile-menu{
+  background:transparent;border:1px solid rgba(255,253,247,.35);color:#fffdf7;border-radius:9px
+}
+.avatar{background:rgba(255,253,247,.12);color:#fffdf7}
+.avatar svg{stroke:#fffdf7}
+.notification-button i{background:#d2b477}
+.away-suitcase-icon{filter:brightness(0) saturate(100%) invert(86%) sepia(18%) saturate(535%) hue-rotate(4deg) brightness(91%)}
+.view{padding-top:22px}
+.welcome-row h2,.panel-heading h3,.settings-card h3,.summary-value{color:var(--text)}
+.greeting,.muted,.summary-foot{color:var(--muted)}
+.primary-button,.button-primary{
+  background:var(--green);color:#fffdf7;border-color:var(--green);border-radius:9px
+}
+.primary-button:hover,.button-primary:hover{background:var(--green-dark)}
+.secondary-button,.button-secondary{
+  background:var(--surface);color:var(--green);border:1px solid var(--line);border-radius:9px
+}
+.text-button{color:var(--green)}
+.summary-card,.panel,.person-card,.settings-card{
+  background:var(--surface);border:1px solid var(--line);border-radius:13px;
+  box-shadow:0 4px 14px rgba(56,42,33,.035)
+}
+.summary-card{padding:17px 18px}
+.summary-label{font-size:10px;letter-spacing:.13em;color:#8d795c}
+.summary-value{color:var(--green)}
+.summary-foot{color:var(--muted)}
+.panel{padding:20px}
+.agenda-item{border-bottom-color:#e8e0d1}
+.agenda-time,.agenda-meta,.task-detail,.task-time{color:var(--muted)}
+.status-dot.done{background:#6c9676;box-shadow:0 0 0 3px #e5eee7}
+.status-dot.progress{background:#b28b4e}
+.status-dot{background:#a69d8f}
+.task-row{border-bottom-color:var(--line)}
+.task-check{border-color:#a69d8f}
+.task-check.checked{background:#6f9879;border-color:#6f9879;color:#fff}
+.filter-chip,.segmented button{background:var(--surface);border-color:var(--line);color:var(--muted);border-radius:8px}
+.filter-chip.selected,.segmented button.selected{background:var(--green-soft,#e5eee7);color:var(--green);border-color:#b9cabb}
+input,select,textarea,.add-inline input,.add-inline select{
+  background:#fffefa;border:1px solid #cfc4b0;color:var(--text);border-radius:8px
+}
+input:focus,select:focus,textarea:focus,.add-inline input:focus{border-color:var(--gold)}
+.settings-card label,.modal label{color:var(--muted)}
+.modal{background:var(--surface);color:var(--text);border-color:var(--line);box-shadow:0 25px 90px rgba(20,20,10,.2)}
+.modal h2,.modal h3{color:var(--green)}
+.file-button{background:var(--surface);border-color:var(--line);color:var(--green);border-radius:9px}
+.empty-icon{background:#f0e8d8;color:var(--gold)}
+.status-banner{background:#eee6d6;color:var(--muted)}
+.app-footer{color:#8a7b6d}
+.app-footer span{color:var(--gold)}
+.wiwy-update-banner{background:var(--green);border-color:#b28b4e;color:#fffdf7}
+.wiwy-update-banner strong{color:#ead6a7}
+.wiwy-update-banner button{background:var(--surface);color:var(--green);border-color:var(--line);border-radius:9px}
+@media(max-width:650px){
+  .main-content{padding:0 15px 12px}
+  .topbar{margin:0 -15px 18px;padding:14px 15px 15px;border-radius:0 0 13px 13px}
+  .header-brand-row{justify-content:flex-start}
+  .header-brand-row img{width:40px;height:40px;flex-basis:40px}
+  .header-brand-row span{font-size:clamp(18px,5vw,23px)}
+  .header-controls-row{grid-template-columns:38px minmax(90px,1fr) auto;gap:7px}
+  .top-actions{gap:6px}
+  .icon-button{padding:0 9px}
+  .view{padding-top:18px}
+  .summary-card{padding:14px}
+}
