@@ -441,7 +441,7 @@ function render() {
 }
 
 // WIWY 0.9.6 — user-controlled application updates.
-const WIWY_VERSION="0.10.3";
+const WIWY_VERSION="0.10.6";
 let wiwyRegistration=null;
 let updateInstallInProgress=false;
 function showUpdateBanner(version,notes=""){
