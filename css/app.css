@@ -831,7 +831,7 @@ button.close-button{
 
 /* All functional buttons use the green surface and brass edge.
    Text-only links and checkbox/radio controls retain their semantic appearance. */
-button:not(.text-button):not(.heading-link):not(.task-check):not(.step-check):not(.checkbox-control):not(.radio-control):not(.close-button),
+button:not(.text-button):not(.heading-link):not(.task-check):not(.step-check):not(.checkbox-control):not(.radio-control):not(.close-button):not(.agenda-task-button):not(.calendar-event-button),
 .file-button,
 .segmented button,
 .weekday-picker button {
@@ -841,7 +841,7 @@ button:not(.text-button):not(.heading-link):not(.task-check):not(.step-check):no
   border: 1px solid #c4a15b !important;
   box-shadow: none !important;
 }
-button:not(.text-button):not(.heading-link):not(.task-check):not(.step-check):not(.checkbox-control):not(.radio-control):not(.close-button):hover:not(:disabled),
+button:not(.text-button):not(.heading-link):not(.task-check):not(.step-check):not(.checkbox-control):not(.radio-control):not(.close-button):not(.agenda-task-button):not(.calendar-event-button):hover:not(:disabled),
 .file-button:hover,
 .segmented button:hover,
 .weekday-picker button:hover {
@@ -858,4 +858,29 @@ button.close-button {
 button:focus-visible {
   outline: 2px solid #d6b76d !important;
   outline-offset: 2px;
+}
+
+/* WIWY 0.10.6 — agenda and calendar entries are content cards, not controls. */
+button.agenda-task-button,
+button.calendar-event-button {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--text) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+button.agenda-task-button:hover:not(:disabled),
+button.calendar-event-button:hover:not(:disabled) {
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border: 0 !important;
+}
+.brand-mark { background: transparent !important; }
+.brand-mark img {
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  background:transparent !important;
 }
