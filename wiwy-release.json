@@ -1,5 +1,5 @@
 {
-  "version": "0.10.6",
-  "released": "2026-11-12",
-  "notes": "Synchronize runtime version, preserve agenda/calendar card styling, and use transparent emblem artwork."
+  "version": "0.10.7",
+  "released": "2026-11-13",
+  "notes": "Profile editing and contact fields, calendar date-based task creation, actionable 24-hour notification inbox, corrected version display, password-manager form hints, forest-green controls."
 }
