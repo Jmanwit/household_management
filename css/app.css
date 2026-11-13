@@ -884,3 +884,19 @@ button.calendar-event-button:hover:not(:disabled) {
   object-fit:contain;
   background:transparent !important;
 }
+
+
+/* WIWY 0.10.7 stabilization */
+input[type="checkbox"], input[type="radio"] { accent-color:#315b43 !important; }
+.task-edit { border-radius:999px !important; padding:6px 10px !important; }
+.topbar .header-brand-row #accountMenu { z-index:1200 !important; }
+.calendar-header { position:relative; }
+.calendar-heading-center { flex:1; }
+.calendar-date-picker { position:absolute; width:1px !important; height:1px !important; opacity:0; pointer-events:none; }
+.calendar-actions { display:flex; justify-content:flex-end; margin:0 0 12px; }
+.week-day.is-today .week-day-head span { outline:2px solid #c4a15b; outline-offset:3px; border-radius:7px; }
+.month-day.is-today { border:2px solid #c4a15b !important; box-shadow:none !important; }
+.notification-row { cursor:pointer; }
+.notification-row-actions { margin-left:auto; }
+.notification-row:focus-visible { outline:2px solid #c4a15b; outline-offset:2px; }
+@media(max-width:650px){ .calendar-actions .primary-button{width:100%;} }
