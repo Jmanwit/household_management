@@ -210,7 +210,7 @@ function renderPeople() {
       <h3>${esc(person.name)}</h3>
       <p>${esc(person.role)} · ${person.accountId ? "Account linked" : "Member profile"} · ${person.active ? "Active" : "Inactive"}</p>
       <div class="person-actions">
-        ${admin ? `<button type="button" class="secondary-button" data-profile-toggle="${person.id}" data-next-active="${person.active ? "false" : "true"}">${person.active ? "Deactivate" : "Reactivate"}</button><button type="button" class="secondary-button danger-button" data-profile-delete="${person.id}">Permanently delete</button>${person.accountId ? `<label class="role-control">Account role<select data-member-role="${person.accountUserId}" data-current-role="${person.accountRole}"><option ${person.accountRole==="Admin"?"selected":""}>Admin</option><option ${person.accountRole==="Manager"?"selected":""}>Manager</option><option ${person.accountRole==="Member"?"selected":""}>Member</option></select></label><button type="button" class="secondary-button" data-profile-access="${person.id}">Remove household login access</button>` : `<button type="button" class="secondary-button" data-invite-profile="${person.id}">Invite / link account</button>`}` : ""}
+        ${admin ? `<button type="button" class="secondary-button" data-profile-edit="${person.id}">Edit profile</button><button type="button" class="secondary-button" data-profile-toggle="${person.id}" data-next-active="${person.active ? "false" : "true"}">${person.active ? "Deactivate" : "Reactivate"}</button><button type="button" class="secondary-button danger-button" data-profile-delete="${person.id}">Permanently delete</button>${person.accountId ? `<label class="role-control">Account role<select data-member-role="${person.accountUserId}" data-current-role="${person.accountRole}"><option ${person.accountRole==="Admin"?"selected":""}>Admin</option><option ${person.accountRole==="Manager"?"selected":""}>Manager</option><option ${person.accountRole==="Member"?"selected":""}>Member</option></select></label><button type="button" class="secondary-button" data-profile-access="${person.id}">Remove household login access</button>` : `<button type="button" class="secondary-button" data-invite-profile="${person.id}">Invite / link account</button>`}` : ""}
         ${manager && person.active ? `<button type="button" class="secondary-button" data-profile-request="${person.id}">Request removal</button>` : ""}
       </div>
     </article>`).join("") : empty("Start with your people.", "Add member profiles now. Accounts and invitations can be linked later.");
@@ -419,6 +419,7 @@ function renderCalendar(){
 }
 function render() {
   const visibleWorkspaceName = authenticatedWorkspace?.name || Store.getState().workspace.name;
+  const aboutVersion = document.getElementById("aboutVersion"); if (aboutVersion) aboutVersion.textContent = `WIWY · Version ${WIWY_VERSION} · Household reliability and profile improvements`;
   $("workspaceName").textContent = visibleWorkspaceName;
   $("settingsWorkspace").value = visibleWorkspaceName;
   const preserveObservanceDraft=$("observanceSettings").contains(document.activeElement);
@@ -441,7 +442,7 @@ function render() {
 }
 
 // WIWY 0.9.6 — user-controlled application updates.
-const WIWY_VERSION="0.10.6";
+const WIWY_VERSION="0.10.7";
 let wiwyRegistration=null;
 let updateInstallInProgress=false;
 function showUpdateBanner(version,notes=""){
@@ -662,28 +663,19 @@ function notificationTaskWhen(task, offset=0) {
   return dt.toLocaleString([], {weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 }
 function renderNotificationCenter() {
-  const current=Cloud.getState(), profile=Cloud.getMembership()?.member_profile_id;
-  const assigned=current.tasks.filter(t=>!t.archived&&(t.assigneeIds||[]).includes(profile));
-  const reminders=assigned.filter(t=>t.start);
-  const records=Cloud.getNotifications();
-  const completions=records.filter(n=>n.notification_type==="completion");
-  const household=records.filter(n=>n.notification_type==="household");
-  const assignments=records.filter(n=>n.notification_type==="assignment");
-  const reminderNotices=records.filter(n=>n.notification_type==="reminder");
-  const row=(title,detail,meta="",id="",read=true)=>`<div class="notification-row ${read?"":"unread"}"><div class="notification-row-copy"><strong>${esc(title)}</strong><span>${esc(detail)}</span>${meta?`<small>${esc(meta)}</small>`:""}</div>${id&&!read?`<button type="button" class="secondary-button notification-read-button" data-notification-read="${esc(id)}">Mark read</button>`:""}</div>`;
-  const section=(name,description,items,empty)=>`<section class="notification-section"><div class="notification-section-head"><h3>${name}</h3><span>${description}</span></div>${items.length?items.join(""):`<p class="notification-empty">${empty}</p>`}</section>`;
-  const assignmentRows=assigned.map(t=>row(t.name,`Assigned to you · ${t.repeat==="once"?"One-time":"Recurring"}`,t.start?`Starts ${notificationTaskWhen(t)}`:"No start time set"));
-  const reminderRows=reminderNotices.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at)).concat(reminders.map(t=>row(t.name,`Scheduled reminder · ${notificationTaskWhen(t)}`,(t.advanceReminderOffsets||[]).length?`Additional: ${t.advanceReminderOffsets.map(reminderOffsetLabel).join(", ")}`:"At scheduled start")));
-  const completionRows=completions.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at));
-  const householdRows=household.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,!n.read_at));
-  const assignmentUnread=assignments.filter(n=>!n.read_at);
-  const assignmentFeed=assignmentRows.concat(assignmentUnread.map(n=>row(n.title,n.body,new Date(n.created_at).toLocaleString(),n.id,true)));
-  $("notificationCenterContent").innerHTML=
-    section("Assignment","All tasks assigned to you",assignmentFeed,"No tasks are currently assigned to you.")+
-    section("Reminder","Upcoming tasks with scheduled reminders",reminderRows,"No upcoming task reminders.")+
-    section("Completion","Tasks you created that someone else completed",completionRows,"No completion updates yet.")+
-    section("Household","General household announcements",householdRows,"No household announcements.");
+  const profile=Cloud.getMembership()?.member_profile_id;
+  const cutoff=Date.now()-24*60*60*1000;
+  const records=Cloud.getNotifications().filter(n=>new Date(n.created_at).getTime()>=cutoff&&!n.dismissed_at);
+  const groups=[
+    ["Household assignments",records.filter(n=>["assignment","task_assignment","household","household_change"].includes(n.notification_type))],
+    ["Task reminders",records.filter(n=>["reminder","task_reminder","advance_reminder","scheduled_start","observance_reminder"].includes(n.notification_type))],
+    ["Task completions",records.filter(n=>["completion","task_completion"].includes(n.notification_type))]
+  ];
+  const row=n=>`<article class="notification-row ${n.read_at?"":"unread"}" data-notification-open="${esc(n.id)}" data-notification-task="${esc(n.task_id||"")}" data-notification-date="${esc(n.occurrence_date||"")}" role="button" tabindex="0"><div class="notification-row-copy"><strong>${esc(n.title)}</strong><span>${esc(n.body)}</span><small>${new Date(n.created_at).toLocaleString()}</small></div><div class="notification-row-actions"><button type="button" class="text-button" data-notification-read="${esc(n.id)}">${n.read_at?"Read":"Mark read"}</button><button type="button" class="text-button danger-button" data-notification-dismiss="${esc(n.id)}">Dismiss</button></div></article>`;
+  const section=([name,items])=>`<section class="notification-section"><div class="notification-section-head"><h3>${name}</h3><span>${items.length}</span></div>${items.length?items.map(row).join(""):`<p class="notification-empty">Nothing here in the last 24 hours.</p>`}</section>`;
+  $("notificationCenterContent").innerHTML=groups.map(section).join("");
 }
+
 function taskEditorSnapshot() {
   return JSON.stringify({
     name:$("taskName").value.trim(),
@@ -700,7 +692,7 @@ function taskEditorSnapshot() {
 function taskEditorHasChanges() {
   return taskEditorSnapshot() !== ($("taskEditor").dataset.initialSnapshot || taskEditorSnapshot());
 }
-function openTask(task=null) {
+function openTask(task=null, initialDate=null) {
   populatePeopleSelects(); $("taskEditor").reset(); operations=[]; selectedDays=new Set(); customReminderOffsets=[];
   $("taskId").value=task?.id||""; $("taskDialogTitle").textContent=task?"Edit task":"Create a task";
   $("taskFormError").hidden=true; $("taskFormError").textContent="";
@@ -709,6 +701,7 @@ function openTask(task=null) {
   if(!task && !Cloud.canAssignAnyone() && Cloud.getMembership()?.member_profile_id) assigned.add(Cloud.getMembership().member_profile_id);
   document.querySelectorAll("[data-assignee-option]").forEach(o=>{o.checked=assigned.has(o.value);o.disabled=!Cloud.canAssignAnyone();});
   $("taskRepeat").value=task?.repeat||"once";
+  if(!task && initialDate) { window.wiwyTaskDraftDate=initialDate; } else { window.wiwyTaskDraftDate=null; }
   $("taskStart").value=task?.start||""; $("taskEnd").value=task?.end||""; $("taskNotes").value=task?.notes||"";
   const savedOffsets=task?.advanceReminderOffsets||[];
   document.querySelectorAll("[data-reminder-offset]").forEach(x=>x.checked=savedOffsets.includes(Number(x.dataset.reminderOffset)));
@@ -749,7 +742,7 @@ async function saveTaskFromForm() {
   const id=$("taskId").value, repeat=$("taskRepeat").value;
   const existingTask=id?Cloud.getState().tasks.find(t=>t.id===id):null;
   if(repeat==="weekdays"&&!selectedDays.size){toast("Choose at least one weekday.");return false;}
-  const task={id:id||undefined,name:$("taskName").value.trim(),assigneeIds:[...document.querySelectorAll("[data-assignee-option]:checked")].map(o=>o.value),repeat,weekdays:repeat==="weekdays"?[...selectedDays]:[],date:repeat==="once"?(existingTask?.date||keyDate()):null,start:$("taskStart").value||null,end:$("taskEnd").value||null,operations,notes:$("taskNotes").value.trim(),advanceReminderOffsets:selectedReminderOffsets(),completionPushEnabled:$("completionPushEnabled").checked,linkedMealId:existingTask?.linkedMealId||null};
+  const task={id:id||undefined,name:$("taskName").value.trim(),assigneeIds:[...document.querySelectorAll("[data-assignee-option]:checked")].map(o=>o.value),repeat,weekdays:repeat==="weekdays"?[...selectedDays]:[],date:repeat==="once"?(existingTask?.date||window.wiwyTaskDraftDate||keyDate()):null,start:$("taskStart").value||null,end:$("taskEnd").value||null,operations,notes:$("taskNotes").value.trim(),advanceReminderOffsets:selectedReminderOffsets(),completionPushEnabled:$("completionPushEnabled").checked,linkedMealId:existingTask?.linkedMealId||null};
   if(!task.name)return false;
   const errorBox=$("taskFormError");errorBox.hidden=true;errorBox.textContent="";
   const submit=$("taskEditor").querySelector('[type="submit"]');
@@ -857,7 +850,7 @@ function setup() {
   });
   document.querySelectorAll("[data-task-filter]").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.taskFilter;document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x===b));renderTasks();});
   document.querySelectorAll("[data-summary-filter]").forEach(card=>{card.setAttribute("role","button");card.setAttribute("tabindex","0");card.setAttribute("aria-label","Show "+card.dataset.summaryFilter+" tasks");const activate=()=>{taskFilter=card.dataset.summaryFilter;setView("tasks");document.querySelectorAll("[data-task-filter]").forEach(x=>x.classList.toggle("selected",x.dataset.taskFilter===taskFilter));renderTasks();};card.addEventListener("click",activate);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate();}});});
-  $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
+  $("addPersonButton").onclick=()=>{$("personEditor").reset();$("personEditId").value="";$("personDialogTitle").textContent="Add a person";$("personEditor").querySelector('[type="submit"]').textContent="Add person";$("personFormError").hidden=true;$("personFormError").textContent="";$("personDialog").showModal();};
   $("peopleGrid").addEventListener("change",async event=>{
     const select=event.target.closest("[data-member-role]");
     if(!select)return;
@@ -890,6 +883,8 @@ function setup() {
   }
 
   $("peopleGrid").addEventListener("click", async event => {
+    const editProfile = event.target.closest("[data-profile-edit]");
+    if (editProfile) { const p=Cloud.getState().people.find(x=>x.id===editProfile.dataset.profileEdit); if(!p)return; $("personEditor").reset(); $("personEditId").value=p.id; $("personDialogTitle").textContent="Edit profile"; $("personName").value=p.name; $("personEmail").value=p.email||""; $("personPhone").value=p.phone||""; $("personBirthDate").value=p.birthDate||""; $("personNotes").value=p.notes||""; $("personColor").value=p.color||"#789a80"; $("personFormError").hidden=true; $("personDialog").showModal(); return; }
     const toggle = event.target.closest("[data-profile-toggle]");
     const request = event.target.closest("[data-profile-request]");
     const approve = event.target.closest("[data-removal-approve]");
@@ -956,7 +951,7 @@ function setup() {
     }
   });
   $("closePersonEditor").onclick=(event)=>{event.preventDefault();$("personDialog").close();};
-  $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(name){const errorBox=$("personFormError");errorBox.hidden=true;errorBox.textContent="";try{await Cloud.addPerson({name,color:$("personColor").value});$("personDialog").close();populatePeopleSelects();render();toast("✓ Household member added.");}catch(error){errorBox.textContent="Could not add person: "+error.message;errorBox.hidden=false;}}});
+  $("personEditor").addEventListener("submit",async e=>{e.preventDefault();const name=$("personName").value.trim();if(!name)return;const errorBox=$("personFormError");errorBox.hidden=true;errorBox.textContent="";const person={name,color:$("personColor").value,birthDate:$("personBirthDate").value,email:$("personEmail").value,phone:$("personPhone").value,notes:$("personNotes").value};const id=$("personEditId").value;try{if(id){await Cloud.updatePerson(id,person);}else{await Cloud.addPerson(person);}$("personDialog").close();populatePeopleSelects();render();toast(id?"Profile updated.":"✓ Household member added.");}catch(error){errorBox.textContent="Could not save profile: "+error.message;errorBox.hidden=false;}});
   $("addMealButton").onclick=()=>openMealEditor();
   $("closeMealEditor").onclick=()=>$("mealDialog").close();
   $("cancelMealEditor").onclick=()=>$("mealDialog").close();
@@ -1134,11 +1129,15 @@ function setup() {
   $("notificationButton").onclick=()=>{renderNotificationCenter();$("notificationDialog").showModal();};
   $("closeNotifications").onclick=()=>$("notificationDialog").close();
   $("notificationCenterContent").addEventListener("click",async e=>{
-    const button=e.target.closest("[data-notification-read]");
-    if(!button)return;
-    button.disabled=true;
-    try{await Cloud.markNotificationRead(button.dataset.notificationRead);renderNotificationCenter();}
-    catch(error){button.disabled=false;toast("Could not mark notification read: "+error.message);}
+    const dismiss=e.target.closest("[data-notification-dismiss]");
+    if(dismiss){dismiss.disabled=true;try{await Cloud.dismissNotification(dismiss.dataset.notificationDismiss);renderNotificationCenter();}catch(error){dismiss.disabled=false;toast("Could not dismiss notification: "+error.message);}return;}
+    const read=e.target.closest("[data-notification-read]");
+    if(read){read.disabled=true;try{await Cloud.markNotificationRead(read.dataset.notificationRead);renderNotificationCenter();}catch(error){read.disabled=false;toast("Could not mark notification read: "+error.message);}return;}
+    const row=e.target.closest("[data-notification-open]");if(!row)return;
+    const taskId=row.dataset.notificationTask;const date=row.dataset.notificationDate||keyDate();
+    try{await Cloud.markNotificationRead(row.dataset.notificationOpen);}catch(error){console.warn("Could not mark notification read",error);}
+    $("notificationDialog").close();
+    if(taskId){const task=Cloud.getState().tasks.find(t=>t.id===taskId);if(task)await openTaskDetails(task,date);else toast("The related task is no longer available.");}
   });
   document.querySelectorAll("[data-reminder-offset]").forEach(x=>x.addEventListener("change",()=>{}));
   $("addCustomReminder").onclick=()=>{
@@ -1209,6 +1208,15 @@ function setup() {
   $("nextDay").onclick=()=>{if(calendarMode==="day")calendarDate=addDays(calendarDate,1);else if(calendarMode==="week")calendarDate=addDays(calendarDate,7);else{const day=calendarDate.getDate();calendarDate.setDate(1);calendarDate.setMonth(calendarDate.getMonth()+1);calendarDate.setDate(Math.min(day,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,0).getDate()));}renderCalendar();};
   $("calendarReturnMonth").onclick=()=>{calendarMode="month";calendarReturnToMonth=false;renderCalendar();};
   $("calendarToday").onclick=()=>{calendarDate=new Date();calendarDate.setHours(12,0,0,0);calendarMode="day";calendarReturnToMonth=false;renderCalendar();};
+  $("calendarAddTask").onclick=()=>openTask(null,keyDate(calendarDate));
+  $("calendarDatePicker").value=keyDate(calendarDate);
+  $("calendarDatePicker").addEventListener("change",e=>{if(!e.target.value)return;calendarDate=new Date(e.target.value+"T12:00:00");calendarMode="day";calendarReturnToMonth=false;renderCalendar();});
+  $("calendarDate").title="Choose date"; $("calendarDate").style.cursor="pointer";
+  $("calendarDate").addEventListener("click",()=>{
+    if(calendarMode==="month") { const p=$("calendarMonthPicker");p.value=`${calendarDate.getFullYear()}-${String(calendarDate.getMonth()+1).padStart(2,"0")}`;if(p.showPicker)p.showPicker();else p.click(); }
+    else { const p=$("calendarDatePicker");p.value=keyDate(calendarDate);if(p.showPicker)p.showPicker();else p.click(); }
+  });
+  $("calendarMonthPicker").addEventListener("change",e=>{if(!e.target.value)return;calendarDate=new Date(e.target.value+"-01T12:00:00");calendarMode="month";calendarReturnToMonth=false;renderCalendar();});
   render();
 }
 // Service worker registration and user-controlled activation are managed by setupWIWYUpdates().

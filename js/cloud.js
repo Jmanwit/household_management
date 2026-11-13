@@ -91,9 +91,16 @@ export async function deleteReminderRule(ruleId) {
   document.dispatchEvent(new CustomEvent("wiwy-cloud-updated"));
 }
 export async function markNotificationRead(id) {
-  const { error } = await client.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id);
+  const timestamp=new Date().toISOString();
+  const { error } = await client.from("notifications").update({read_at:timestamp}).eq("id",id).eq("workspace_id",workspace.id);
   if (error) throw error;
-  const row = notifications.find(n=>n.id===id); if (row) row.read_at = new Date().toISOString();
+  const row = notifications.find(n=>n.id===id); if (row) row.read_at = timestamp;
+}
+export async function dismissNotification(id) {
+  const timestamp=new Date().toISOString();
+  const { error } = await client.from("notifications").update({dismissed_at:timestamp}).eq("id",id).eq("workspace_id",workspace.id);
+  if (error) throw error;
+  const row=notifications.find(n=>n.id===id); if(row) row.dismissed_at=timestamp;
 }
 export function canManageAway() { return isAdmin() || membership?.role === "Manager"; }
 export function getCurrentUser() { return user; }
@@ -177,11 +184,11 @@ export async function refresh() {
       ? client.from("profile_removal_requests").select("id,workspace_id,profile_id,requested_by,status,requested_at,reviewed_by,reviewed_at,review_note").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", {ascending:true})
       : Promise.resolve({ data: [], error: null });
     const [peopleRes, taskRes, activityRes, awayRes, notificationRes, requestRes, mealsRes, groceriesRes, membershipsRes, settingsRes, rulesRes] = await Promise.all([
-      client.from("member_profiles").select("id,workspace_id,display_name,color,birth_date,is_active,created_at").eq("workspace_id", workspace.id).order("created_at"),
+      client.from("member_profiles").select("id,workspace_id,display_name,color,birth_date,contact_email,phone_number,profile_notes,avatar_url,is_active,created_at").eq("workspace_id", workspace.id).order("created_at"),
       client.from("tasks").select("id,workspace_id,name,assignee_profile_id,linked_meal_id,recurrence,start_time,end_time,notes,archived_at,created_by,created_at,updated_at,advance_reminder_offsets,completion_push_enabled").eq("workspace_id", workspace.id).order("created_at", {ascending:false}),
       client.from("activity_ledger").select("id,workspace_id,actor_user_id,actor_profile_id,action,entity_type,entity_id,detail,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
       client.from("away_periods").select("id,workspace_id,member_profile_id,starts_at,ends_at,is_active,created_by").eq("workspace_id", workspace.id).eq("is_active", true).order("starts_at", {ascending:false}),
-      client.from("notifications").select("id,notification_type,title,body,task_id,occurrence_id,occurrence_date,push_requested,created_at,read_at,event_key").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
+      client.from("notifications").select("id,notification_type,title,body,task_id,occurrence_id,occurrence_date,push_requested,created_at,read_at,dismissed_at,event_key").eq("workspace_id", workspace.id).order("created_at", {ascending:false}).limit(100),
       requestQuery,
       client.from("meals").select("id,workspace_id,meal_date,meal_type,name,notes,recipe,created_by,created_at").eq("workspace_id", workspace.id).order("meal_date"),
       client.from("grocery_items").select("id,workspace_id,name,category,quantity,notes,is_completed,linked_meal_id,added_by,created_at").eq("workspace_id", workspace.id).order("created_at", {ascending:true}),
@@ -241,7 +248,7 @@ export async function refresh() {
     }
     const linkedByProfile = new Map((membershipsRes.data || []).filter(m=>m.member_profile_id).map(m=>[m.member_profile_id,m]));
     state = {
-      people: (peopleRes.data || []).map(p => { const linked=linkedByProfile.get(p.id); return {id:p.id,name:p.display_name,color:p.color,birthDate:p.birth_date||null,active:p.is_active !== false,role:linked?.role || "Household member",accountRole:linked?.role || null,accountId:linked?.user_id || null,accountUserId:linked?.user_id || null}; }),
+      people: (peopleRes.data || []).map(p => { const linked=linkedByProfile.get(p.id); return {id:p.id,name:p.display_name,color:p.color,birthDate:p.birth_date||null,email:p.contact_email||"",phone:p.phone_number||"",notes:p.profile_notes||"",avatarUrl:p.avatar_url||"",active:p.is_active !== false,role:linked?.role || "Household member",accountRole:linked?.role || null,accountId:linked?.user_id || null,accountUserId:linked?.user_id || null}; }),
       tasks: taskRows.map(t => mapTask(t, ops, assignments, occurrences, completions)),
       meals: (mealsRes.data || []).map(m => ({id:m.id,date:m.meal_date,type:m.meal_type,name:m.name,notes:m.notes || "",recipe:m.recipe || {},createdAt:m.created_at})),
       groceries: (groceriesRes.data || []).map(g => ({id:g.id,name:g.name,category:g.category,quantity:g.quantity || "",notes:g.notes || "",done:!!g.is_completed,linkedMealId:g.linked_meal_id || null,createdAt:g.created_at}))
@@ -277,13 +284,27 @@ export async function reviewProfileRemoval(requestId, approve) {
 export async function addPerson(person) {
   if (!canManageProfiles()) throw new Error("You don't have permission to add household profiles.");
   const { data, error } = await client.from("member_profiles").insert({
-    workspace_id: workspace.id, display_name: person.name.trim(), color: person.color || "#789a80"
+    workspace_id: workspace.id, display_name: person.name.trim(), color: person.color || "#789a80", birth_date:person.birthDate||null, contact_email:person.email?.trim()||null, phone_number:person.phone?.trim()||null, profile_notes:person.notes?.trim()||null, avatar_url:person.avatarUrl?.trim()||null
   }).select("id,display_name,color,created_at").single();
   if (error) throw error;
   await recordActivity("Added a household member", "member_profile", data.id, {name:data.display_name});
   await refresh();
   return data;
 }
+
+export async function updatePerson(profileId, person) {
+  if (!canManageProfiles()) throw new Error("You don't have permission to edit household profiles.");
+  if (!person.name?.trim()) throw new Error("A member name is required.");
+  const { error } = await client.from("member_profiles").update({
+    display_name:person.name.trim(), color:person.color||"#789a80", birth_date:person.birthDate||null,
+    contact_email:person.email?.trim()||null, phone_number:person.phone?.trim()||null,
+    profile_notes:person.notes?.trim()||null, avatar_url:person.avatarUrl?.trim()||null, updated_at:new Date().toISOString()
+  }).eq("id",profileId).eq("workspace_id",workspace.id);
+  if (error) throw error;
+  await recordActivity("Updated a household profile","member_profile",profileId,{name:person.name.trim()});
+  await refresh();
+}
+
 export async function saveMeal(meal) {
   if (!meal.name?.trim()) throw new Error("A meal name is required.");
   const payload = {workspace_id:workspace.id,meal_date:meal.date,meal_type:meal.type,name:meal.name.trim(),notes:meal.notes || ""};
@@ -453,7 +474,7 @@ export async function setOperationCompletion(taskId, dateKey, operationId, compl
   await refresh();
   const updated = state.tasks.find(t => t.id === taskId);
   const required = (updated?.operations || []).filter(o => o.required);
-  if (required.length && required.every(o => o.completed) && updated.occurrences?.[dateKey]?.status !== "completed") {
+  if (required.length && required.every(o => !!o.completedDates?.[dateKey]) && updated.occurrences?.[dateKey]?.status !== "completed") {
     await setOccurrence(taskId, dateKey, "completed");
   } else if (completed && updated.occurrences?.[dateKey]?.status === "not_started") {
     await setOccurrence(taskId, dateKey, "in_progress");
